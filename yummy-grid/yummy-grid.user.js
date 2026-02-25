@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         YummyAnime Grid View
+// @name         YummyAnime - Grid View
 // @namespace    http://tampermonkey.net/
 // @version      1.5
 // @description  Сетка аниме с большими постерами
@@ -10,6 +10,7 @@
 // @match        https://ru.yummyani.me/*
 // @match        https://yummyani.me/*
 // @match        http://ru.yummyani.me/*
+// @match        http://site.yummyani.me/*
 // @match        http://yummyani.me/*
 // @grant        none
 // @run-at       document-end
