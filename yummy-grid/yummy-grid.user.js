@@ -9,9 +9,7 @@
 // @downloadURL  https://raw.githubusercontent.com/128team/tm_scripts/main/yummy-grid/yummy-grid.user.js
 // @match        https://ru.yummyani.me/*
 // @match        https://yummyani.me/*
-// @match        http://ru.yummyani.me/*
-// @match        http://site.yummyani.me/*
-// @match        http://yummyani.me/*
+// @match        https://site.yummyani.me/*
 // @grant        none
 // @run-at       document-end
 // @noframes
