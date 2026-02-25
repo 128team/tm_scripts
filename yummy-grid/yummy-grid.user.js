@@ -1,15 +1,16 @@
 // ==UserScript==
 // @name         YummyAnime Grid View
 // @namespace    http://tampermonkey.net/
-// @version      1.4
+// @version      1.5
 // @description  Сетка аниме с большими постерами
 // @author       d08
+// @supportURL   https://t.me/d128d08
+// @updateURL    https://raw.githubusercontent.com/128team/tm_scripts/main/yummy-grid/yummy-grid.user.js
+// @downloadURL  https://raw.githubusercontent.com/128team/tm_scripts/main/yummy-grid/yummy-grid.user.js
 // @match        https://ru.yummyani.me/*
 // @match        https://yummyani.me/*
 // @match        http://ru.yummyani.me/*
 // @match        http://yummyani.me/*
-// @include      https://ru.yummyani.me/*
-// @include      https://yummyani.me/*
 // @grant        none
 // @run-at       document-end
 // @noframes
