@@ -13,6 +13,7 @@
 // @grant        none
 // @run-at       document-end
 // @noframes
+// @license      MIT
 // ==/UserScript==
 
 
