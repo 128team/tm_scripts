@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YummyAnime - Grid View
-// @namespace    http://tampermonkey.net/
-// @version      1.5
+// @namespace    https://github.com/128team/tm_scripts
+// @version      1.5.1
 // @description  Сетка аниме с большими постерами
 // @author       d08
 // @supportURL   https://github.com/128team/tm_scripts/issues
@@ -11,6 +11,7 @@
 // @match        https://yummyani.me/*
 // @match        https://site.yummyani.me/*
 // @grant        none
+// @icon         https://raw.githubusercontent.com/128team/assets/main/logo128b.jpeg
 // @run-at       document-end
 // @noframes
 // @license      MIT
