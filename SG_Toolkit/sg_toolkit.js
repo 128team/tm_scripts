@@ -1,8 +1,10 @@
 // ==UserScript==
 // @name         SG Toolkit Pro
+// @name:ru      SG Toolkit Pro
 // @namespace    https://github.com/128team/tm_scripts
 // @version      3.2.0
-// @description  Advanced giveaway toolkit for SteamGifts - filters, inline enter, ratings, sorting & more
+// @description     Advanced giveaway toolkit for SteamGifts - filters, inline enter, ratings, sorting & more
+// @description:ru  Продвинутый тулкит для SteamGifts — фильтры, inline enter, рейтинги Steam и сортировка
 // @author       d08
 // @supportURL   https://github.com/128team/tm_scripts/issues
 // @updateURL    https://raw.githubusercontent.com/128team/tm_scripts/main/SG_Toolkit/sg_toolkit.js
