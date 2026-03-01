@@ -126,6 +126,9 @@
     let listObserver = null;
     let rebuildTimeout = null;
     let epLoadTimeout  = null;
+    let scrollObserver = null;
+    let sentinel       = null;
+    let autoLoadBusy   = false;
 
     let gridCols = '5';
     try { gridCols = localStorage.getItem('ymg-cols') || '5'; } catch(e) {}
@@ -455,6 +458,7 @@
 
         if (epLoadTimeout) clearTimeout(epLoadTimeout);
         epLoadTimeout = setTimeout(loadEpisodes, 300);
+        setupAutoLoad();
     }
 
     function createGridDiv() {
@@ -462,6 +466,46 @@
         gridDiv.className = 'ym-grid';
         gridDiv.id = 'ym-grid-box';
         return gridDiv;
+    }
+
+    // автоподгрузка: ищем кнопку «Ещё» и кликаем её когда юзер доскроллил до конца грида
+    function findMoreBtn() {
+        const buttons = document.querySelectorAll('button');
+        for (let i = 0; i < buttons.length; i++) {
+            if (buttons[i].textContent.trim() === 'Ещё') return buttons[i];
+        }
+        return null;
+    }
+
+    function teardownAutoLoad() {
+        if (scrollObserver) { scrollObserver.disconnect(); scrollObserver = null; }
+        if (sentinel) { sentinel.remove(); sentinel = null; }
+        autoLoadBusy = false;
+    }
+
+    function setupAutoLoad() {
+        teardownAutoLoad();
+        if (!isOn || !gridDiv) return;
+
+        const moreBtn = findMoreBtn();
+        if (!moreBtn) return;
+
+        sentinel = document.createElement('div');
+        sentinel.style.height = '1px';
+        gridDiv.parentNode.insertBefore(sentinel, gridDiv.nextSibling);
+
+        scrollObserver = new IntersectionObserver(function(entries) {
+            if (!entries[0].isIntersecting || autoLoadBusy) return;
+            const btn = findMoreBtn();
+            if (!btn) { teardownAutoLoad(); return; }
+            autoLoadBusy = true;
+            btn.click();
+            // cooldown 1с — за это время MutationObserver перестроит грид
+            // и setupAutoLoad вызовется заново из rebuildGrid
+            setTimeout(function() { autoLoadBusy = false; }, 1000);
+        }, { rootMargin: '300px' });
+
+        scrollObserver.observe(sentinel);
     }
 
     // debounce 150мс - чтоб MutationObserver не устроил ддос на наш же rebuildGrid
@@ -556,10 +600,12 @@
         startObserver();
         try { localStorage.setItem('ymg', '1'); } catch(e) {}
         setTimeout(loadEpisodes, 300);
+        setupAutoLoad();
         return true;
     }
 
     function turnOff() {
+        teardownAutoLoad();
         stopObserver();
         if (gridDiv) { gridDiv.remove(); gridDiv = null; }
         if (savedUl) savedUl.classList.remove('ym-hide');
