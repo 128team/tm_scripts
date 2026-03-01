@@ -137,6 +137,10 @@
     let sidebarHidden = false;
     try { sidebarHidden = localStorage.getItem('ymg-sidebar') === '1'; } catch(e) {}
 
+    let lastItemsKey = ''; // fingerprint для skip лишних rebuild
+
+    const isMobile = window.matchMedia('(pointer:coarse)').matches;
+
     applyColsCss(gridCols);
 
 
@@ -199,14 +203,16 @@
         if (a) d.href = a.getAttribute('href') || '#';
         d.slug = d.href.replace('/catalog/item/', '');
 
-        // постер: data-big > data-medium > src. всегда берём максимальное качество (250x350)
+        // постер: на мобилке medium (легче), на десктопе big (чётче)
         const img = li.querySelector('img[src*="posters"]');
         if (img) {
-            d.poster = img.getAttribute('data-big') ||
-                       img.getAttribute('data-medium') ||
-                       img.getAttribute('src') || '';
-            d.poster = d.poster.replace(/posters\/(small|medium)\//, 'posters/big/');
+            const big = img.getAttribute('data-big') || '';
+            const med = img.getAttribute('data-medium') || '';
+            const src = img.getAttribute('src') || '';
+            d.poster = isMobile ? (med || src || big) : (big || med || src);
+            d.posterFallback = isMobile ? (src || med || big) : (med || src);
             if (d.poster.indexOf('//') === 0) d.poster = 'https:' + d.poster;
+            if (d.posterFallback && d.posterFallback.indexOf('//') === 0) d.posterFallback = 'https:' + d.posterFallback;
         }
 
         const statusEl = li.querySelector('span[data-status]');
@@ -311,6 +317,17 @@
 
         h += '</div>';
         c.innerHTML = h;
+
+        // fallback постера: если основной URL не загрузился — пробуем запасной
+        if (d.posterFallback) {
+            const posterImg = c.querySelector('.ym-card-poster img');
+            if (posterImg) {
+                posterImg.onerror = function() {
+                    this.onerror = null;
+                    this.src = d.posterFallback;
+                };
+            }
+        }
 
         // кнопки строим через DOM, а не innerHTML — SVG из чужого DOM не должен идти как сырая строка
         const gearMenu = c.querySelector('.ym-gear-menu');
@@ -436,6 +453,14 @@
     //  Virtual DOM? не, не слышали. работает - не трогай
 
 
+    function itemsFingerprint(items) {
+        // быстрый fingerprint: кол-во + href первого и последнего
+        if (!items.length) return '';
+        const fa = items[0].querySelector('a');
+        const la = items[items.length - 1].querySelector('a');
+        return items.length + ':' + (fa ? fa.getAttribute('href') : '') + ':' + (la ? la.getAttribute('href') : '');
+    }
+
     function rebuildGrid() {
         if (!isOn) return;
         const items = findItems();
@@ -450,11 +475,21 @@
             savedUl.parentNode.insertBefore(gridDiv || createGridDiv(), savedUl.nextSibling);
         }
 
-        if (!gridDiv) return;
-        gridDiv.innerHTML = '';
-        for (let i = 0; i < items.length; i++) {
-            gridDiv.appendChild(makeCard(parse(items[i])));
+        // skip если ничего не изменилось — главный буст на мобилке
+        const key = itemsFingerprint(items);
+        if (key === lastItemsKey && gridDiv && gridDiv.children.length) {
+            setupAutoLoad();
+            return;
         }
+        lastItemsKey = key;
+
+        if (!gridDiv) return;
+        const frag = document.createDocumentFragment();
+        for (let i = 0; i < items.length; i++) {
+            frag.appendChild(makeCard(parse(items[i])));
+        }
+        gridDiv.innerHTML = '';
+        gridDiv.appendChild(frag); // один reflow вместо N
 
         if (epLoadTimeout) clearTimeout(epLoadTimeout);
         epLoadTimeout = setTimeout(loadEpisodes, 300);
@@ -508,10 +543,11 @@
         scrollObserver.observe(sentinel);
     }
 
-    // debounce 150мс - чтоб MutationObserver не устроил ддос на наш же rebuildGrid
+    // debounce: 300мс на мобилке (CPU слабее), 150мс на десктопе
+    const REBUILD_DELAY = isMobile ? 300 : 150;
     function scheduleRebuild() {
         if (rebuildTimeout) clearTimeout(rebuildTimeout);
-        rebuildTimeout = setTimeout(rebuildGrid, 150);
+        rebuildTimeout = setTimeout(rebuildGrid, REBUILD_DELAY);
     }
 
 
@@ -528,7 +564,13 @@
             let dominated = false;
             for (let i = 0; i < mutations.length; i++) {
                 const m = mutations[i];
+                // игнорируем наш собственный грид
                 if (gridDiv && (gridDiv.contains(m.target) || m.target === gridDiv)) continue;
+                // игнорируем sentinel
+                if (sentinel && (m.target === sentinel || sentinel.contains(m.target))) continue;
+                // реагируем только на изменения внутри или рядом с savedUl
+                if (savedUl && m.target !== savedUl && !savedUl.contains(m.target) &&
+                    m.target !== savedUl.parentElement) continue;
                 if (m.addedNodes.length || m.removedNodes.length) { dominated = true; break; }
             }
             if (dominated) scheduleRebuild();
@@ -593,8 +635,11 @@
         if (!savedUl) return false;
         if (gridDiv) gridDiv.remove();
         gridDiv = createGridDiv();
-        for (let i = 0; i < items.length; i++) gridDiv.appendChild(makeCard(parse(items[i])));
+        const frag = document.createDocumentFragment();
+        for (let i = 0; i < items.length; i++) frag.appendChild(makeCard(parse(items[i])));
+        gridDiv.appendChild(frag);
         savedUl.parentNode.insertBefore(gridDiv, savedUl.nextSibling);
+        lastItemsKey = itemsFingerprint(items);
         savedUl.classList.add('ym-hide');
         isOn = true;
         startObserver();
