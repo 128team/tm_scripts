@@ -2,7 +2,7 @@
 // @name         SG Toolkit Pro
 // @name:ru      SG Toolkit Pro
 // @namespace    https://github.com/128team/tm_scripts
-// @version      3.2.0
+// @version      3.2.1
 // @description     Advanced giveaway toolkit for SteamGifts - filters, inline enter, ratings, sorting & more
 // @description:ru  Продвинутый тулкит для SteamGifts — фильтры, inline enter, рейтинги Steam и сортировка
 // @author       d08
@@ -23,7 +23,7 @@
 (function () {
     'use strict';
 
-    const VER = '3.2.0';
+    const VER = '3.2.1';
 
     /* 0. PURE UTILITIES  (no dependencies, no drama - these ones I actually like) */
     const TIMINGS = {
@@ -50,7 +50,7 @@
         f_dimMode: false, f_sort: 'default',
         x_inlineEnter: false, x_showChance: false, x_showPtsBadge: false,
         x_wlGlow: false, x_steamRating: false, x_steamLink: false,
-        x_highlightLvNeg: false, x_autoScroll: false,
+        x_highlightLvNeg: false, x_darkTheme: false, x_autoScroll: false,
         ui_scale: 100, ui_panelW: 330, ui_fabSize: 48,
         ui_panelOpacity: 95, ui_fabX: -1, ui_fabY: -1,
         ui_lang: 'auto',
@@ -103,6 +103,7 @@
             x_steam: 'Steam Store link',
             sh_highlight: '🎨 Highlights',
             x_wl: 'Wishlist highlight', x_lvneg: 'Level-locked', x_lvneg_hint: 'Red stripe',
+            x_dark: 'Dark theme', x_dark_hint: 'Dark mode for the entire site',
             sh_scroll: '📜 Scroll', x_scroll: 'Auto-scroll', x_scroll_hint: 'Loads next pages while scrolling',
             sh_scale: '📐 Interface scale',
             ui_text: 'Text size', ui_panel_w: 'Panel width', ui_btn_sz: 'Button size', ui_opacity: 'Opacity',
@@ -145,6 +146,7 @@
             x_steam: 'Ссылка на Steam Store',
             sh_highlight: '🎨 Подсветка',
             x_wl: 'Wishlist подсветка', x_lvneg: 'Недоступный уровень', x_lvneg_hint: 'Красная полоска',
+            x_dark: 'Тёмная тема', x_dark_hint: 'Тёмный режим для всего сайта',
             sh_scroll: '📜 Прокрутка', x_scroll: 'Авто-скролл', x_scroll_hint: 'Подгружает следующие страницы при прокрутке',
             sh_scale: '📐 Масштаб интерфейса',
             ui_text: 'Размер текста', ui_panel_w: 'Ширина панели', ui_btn_sz: 'Размер кнопки', ui_opacity: 'Прозрачность',
@@ -639,12 +641,18 @@
     }
     const autoScroller = new AutoScroller();
 
+    /* 7c. DARK THEME  (toggles the whole site dark. your eyes will thank you at 3am.) */
+    function applyDarkTheme() {
+        document.documentElement.classList.toggle('sgfp-dark', !!C.x_darkTheme);
+    }
+
     /* 8. RUN ALL  (the function that calls everything. yes, every time. yes, even that.) */
     function runAll() {
         const ga = parseAll();
         decorate(ga);
         addInlineEnterButtons(ga);
         applyFilters(ga);
+        applyDarkTheme();
         if (C.x_steamRating) addRatings(ga);
         if (C.x_autoScroll) autoScroller.start(); else autoScroller.stop();
     }
@@ -941,6 +949,121 @@
 .sgfp-dimmed:hover { opacity: .65; }
 .sgfp-hidden-ga { display: none !important; }
 .sgfp-lvneg-hl .giveaway__row-inner-wrap { box-shadow: inset 3px 0 0 #e05555 !important; }
+
+/* ═══ DARK THEME ═══ */
+html.sgfp-dark { color-scheme: dark; }
+html.sgfp-dark body,
+html.sgfp-dark .page__outer-wrap { background: #1a1d23 !important; color: #c8cdd4 !important; }
+
+/* Header & Nav */
+html.sgfp-dark .header { background: #14171c !important; }
+html.sgfp-dark .nav__button-container .nav__button,
+html.sgfp-dark .nav__button-container--notification .nav__button { background: #1e222a !important; }
+html.sgfp-dark .nav__button-container .nav__button:hover,
+html.sgfp-dark .nav__button-container--notification .nav__button:hover { background: #282d38 !important; }
+html.sgfp-dark .nav__sits, html.sgfp-dark .nav__heading,
+html.sgfp-dark .nav__heading__button, html.sgfp-dark .nav__heading__secondary-link,
+html.sgfp-dark .header__button--is-dropdown { color: #a0a8b4 !important; }
+html.sgfp-dark .nav__absolute-dropdown { background: #1e222a !important; border-color: #2e3440 !important; }
+html.sgfp-dark .nav__absolute-dropdown a { color: #b0b8c4 !important; }
+html.sgfp-dark .nav__absolute-dropdown a:hover { background: #282d38 !important; }
+html.sgfp-dark .nav__row { border-color: #2e3440 !important; }
+html.sgfp-dark .nav__row:hover { background: #282d38 !important; }
+
+/* Search */
+html.sgfp-dark .sidebar__search-container { background: #1e222a !important; border-color: #2e3440 !important; }
+html.sgfp-dark .sidebar__search-input { background: transparent !important; color: #c8cdd4 !important; }
+
+/* Featured giveaway */
+html.sgfp-dark .featured__container { background: linear-gradient(135deg, #1e2530 0%, #1a1d23 100%) !important; }
+html.sgfp-dark .featured__heading, html.sgfp-dark .featured__heading__medium,
+html.sgfp-dark .featured__heading__small { color: #e0e4ea !important; }
+html.sgfp-dark .featured__column { border-color: rgba(255,255,255,.08) !important; }
+html.sgfp-dark .global__image-outer-wrap--missing-image { background: #252830 !important; }
+
+/* Giveaway rows */
+html.sgfp-dark .giveaway__row-inner-wrap { background: #1e222a !important; }
+html.sgfp-dark .giveaway__row-outer-wrap { border-bottom-color: #2a2e38 !important; }
+html.sgfp-dark .giveaway__heading__name { color: #d8dde4 !important; }
+html.sgfp-dark .giveaway__heading__thin { color: #6a7080 !important; }
+html.sgfp-dark .giveaway__columns span,
+html.sgfp-dark .giveaway__column--width-fill span { color: #7a8290 !important; }
+html.sgfp-dark .giveaway__links a { color: #6a7a8a !important; }
+html.sgfp-dark .giveaway__links a:hover { color: #8aa0b8 !important; }
+html.sgfp-dark .giveaway__row-inner-wrap.is-faded { opacity: .45; }
+
+/* Pinned giveaways */
+html.sgfp-dark .pinned-giveaways__outer-wrap { background: #161920 !important; border-color: #2a2e38 !important; }
+html.sgfp-dark .pinned-giveaways__inner-wrap { background: transparent !important; }
+
+/* Sidebar */
+html.sgfp-dark .sidebar { background: transparent !important; }
+html.sgfp-dark .sidebar__heading { color: #8a9aaa !important; border-bottom-color: #2a2e38 !important; }
+html.sgfp-dark .sidebar__navigation__item { border-color: #2a2e38 !important; }
+html.sgfp-dark .sidebar__navigation__item__link { color: #a0a8b4 !important; }
+html.sgfp-dark .sidebar__navigation__item__link:hover { background: #1e222a !important; }
+html.sgfp-dark .sidebar__navigation__item__link--is-selected { background: #252a34 !important; }
+html.sgfp-dark .sidebar__navigation__item__count { color: #6a7a8a !important; }
+
+/* Pagination */
+html.sgfp-dark .pagination { background: #1e222a !important; border-color: #2a2e38 !important; }
+html.sgfp-dark .pagination__navigation a { color: #7a8a9a !important; border-color: #2a2e38 !important; }
+html.sgfp-dark .pagination__navigation a:hover { background: #282d38 !important; color: #c8cdd4 !important; }
+html.sgfp-dark .pagination__navigation a.is-selected { background: #2a3a50 !important; color: #7ab8e0 !important; }
+
+/* Giveaway page (single) */
+html.sgfp-dark .page__heading { border-bottom-color: #2a2e38 !important; }
+html.sgfp-dark .page__heading__breadcrumbs a { color: #6a7a8a !important; }
+html.sgfp-dark .sidebar__entry-insert, html.sgfp-dark .sidebar__entry-delete,
+html.sgfp-dark .sidebar__entry-loading { background: #252a34 !important; border-color: #2a2e38 !important; }
+html.sgfp-dark .sidebar__entry-insert { color: #4ecb71 !important; }
+html.sgfp-dark .sidebar__entry-delete { color: #e05555 !important; }
+
+/* Comments */
+html.sgfp-dark .comment__parent { border-color: #2a2e38 !important; }
+html.sgfp-dark .comment__child { border-color: #2a2e38 !important; }
+html.sgfp-dark .comment_inner { background: transparent !important; }
+html.sgfp-dark .comment__summary { border-color: #2a2e38 !important; }
+html.sgfp-dark .comment__username a { color: #7ab8e0 !important; }
+html.sgfp-dark .comment__description, html.sgfp-dark .markdown { color: #b0b8c4 !important; }
+html.sgfp-dark .comment__actions a { color: #6a7a8a !important; }
+html.sgfp-dark .comment__toggle { color: #6a7a8a !important; }
+
+/* Tables & discussions */
+html.sgfp-dark .table__heading { background: #14171c !important; color: #7a8a9a !important; }
+html.sgfp-dark .table__row-inner-wrap { background: #1e222a !important; border-bottom-color: #2a2e38 !important; }
+html.sgfp-dark .table__row-outer-wrap { border-bottom-color: #2a2e38 !important; }
+html.sgfp-dark .table__column--width-fill a { color: #d0d4da !important; }
+html.sgfp-dark .table__column__secondary-link { color: #6a7a8a !important; }
+html.sgfp-dark .table__column--width-small { color: #7a8a9a !important; }
+
+/* Forms & inputs */
+html.sgfp-dark .form__input-small, html.sgfp-dark .form__input-large,
+html.sgfp-dark textarea, html.sgfp-dark input[type="text"],
+html.sgfp-dark input[type="number"], html.sgfp-dark select { background: #14171c !important; border-color: #2e3440 !important; color: #c8cdd4 !important; }
+
+/* Footer */
+html.sgfp-dark .footer__outer-wrap { background: #14171c !important; }
+html.sgfp-dark .footer__outer-wrap a, html.sgfp-dark .footer__outer-wrap span { color: #5a6a7a !important; }
+
+/* Generic links & text */
+html.sgfp-dark a { color: #7ab8e0; }
+html.sgfp-dark .page__heading__button, html.sgfp-dark .page__heading__button a { color: #7a8a9a !important; }
+html.sgfp-dark .page__heading__button:hover { color: #a0b0c0 !important; }
+
+/* Level badges */
+html.sgfp-dark .giveaway__column--contributor-level { color: #7a8a9a !important; }
+html.sgfp-dark .giveaway__column--contributor-level--positive { color: #4ecb71 !important; }
+html.sgfp-dark .giveaway__column--contributor-level--negative { color: #e05555 !important; }
+
+/* Misc */
+html.sgfp-dark .global__image-outer-wrap { border-color: #2a2e38 !important; }
+html.sgfp-dark .widget-container { border-color: #2a2e38 !important; }
+html.sgfp-dark .page_heading_btn { background: #252a34 !important; }
+html.sgfp-dark ::-webkit-scrollbar { width: 8px; }
+html.sgfp-dark ::-webkit-scrollbar-track { background: #1a1d23; }
+html.sgfp-dark ::-webkit-scrollbar-thumb { background: #2e3440; border-radius: 4px; }
+html.sgfp-dark ::-webkit-scrollbar-thumb:hover { background: #3e4450; }
         `;
         document.head.appendChild(s);
     }
@@ -1007,6 +1130,7 @@
             <div class="sgfp-sh">${T('sh_highlight')}</div>
             ${sw('sgfp-x-wl', T('x_wl'), C.x_wlGlow)}
             ${sw('sgfp-x-lvneg', T('x_lvneg'), C.x_highlightLvNeg, T('x_lvneg_hint'))}
+            ${sw('sgfp-x-dark', T('x_dark'), C.x_darkTheme, T('x_dark_hint'))}
             <div class="sgfp-sh">${T('sh_scroll')}</div>
             ${sw('sgfp-x-scroll', T('x_scroll'), C.x_autoScroll, T('x_scroll_hint'))}
         </div>`;
@@ -1172,6 +1296,7 @@
         C.x_steamLink   = $id('sgfp-x-steam').checked;
         C.x_wlGlow      = $id('sgfp-x-wl').checked;
         C.x_highlightLvNeg = $id('sgfp-x-lvneg').checked;
+        C.x_darkTheme   = $id('sgfp-x-dark').checked;
         C.x_autoScroll  = $id('sgfp-x-scroll').checked;
         cfgSave(C);
     }
