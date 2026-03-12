@@ -2,7 +2,7 @@
 // @name         SG Toolkit Pro
 // @name:ru      SG Toolkit Pro
 // @namespace    https://github.com/128team/tm_scripts
-// @version      3.2.1
+// @version      3.2.2
 // @description     Advanced giveaway toolkit for SteamGifts - filters, inline enter, ratings, sorting & more
 // @description:ru  Продвинутый тулкит для SteamGifts — фильтры, inline enter, рейтинги Steam и сортировка
 // @author       d08
@@ -105,6 +105,8 @@
             x_wl: 'Wishlist highlight', x_lvneg: 'Level-locked', x_lvneg_hint: 'Red stripe',
             x_dark: 'Dark theme', x_dark_hint: 'Dark mode for the entire site',
             sh_scroll: '📜 Scroll', x_scroll: 'Auto-scroll', x_scroll_hint: 'Loads next pages while scrolling',
+            btn_loadall: '⏬ Load all pages', btn_loadall_stop: '⏹ Stop loading',
+            scroll_loadall: (cur, tot) => tot ? `⏳ Loading all pages... (${cur}/${tot})` : `⏳ Loading all pages... (page ${cur})`,
             sh_scale: '📐 Interface scale',
             ui_text: 'Text size', ui_panel_w: 'Panel width', ui_btn_sz: 'Button size', ui_opacity: 'Opacity',
             sh_pos: '📍 Position',
@@ -148,6 +150,8 @@
             x_wl: 'Wishlist подсветка', x_lvneg: 'Недоступный уровень', x_lvneg_hint: 'Красная полоска',
             x_dark: 'Тёмная тема', x_dark_hint: 'Тёмный режим для всего сайта',
             sh_scroll: '📜 Прокрутка', x_scroll: 'Авто-скролл', x_scroll_hint: 'Подгружает следующие страницы при прокрутке',
+            btn_loadall: '⏬ Загрузить все страницы', btn_loadall_stop: '⏹ Остановить загрузку',
+            scroll_loadall: (cur, tot) => tot ? `⏳ Загрузка всех страниц... (${cur}/${tot})` : `⏳ Загрузка всех страниц... (стр. ${cur})`,
             sh_scale: '📐 Масштаб интерфейса',
             ui_text: 'Размер текста', ui_panel_w: 'Ширина панели', ui_btn_sz: 'Размер кнопки', ui_opacity: 'Прозрачность',
             sh_pos: '📍 Позиция',
@@ -582,6 +586,11 @@
         _onScroll() {
             if (!this._active || this._loading || this._done) return;
             if (window.innerHeight + window.scrollY < document.documentElement.scrollHeight - TIMINGS.SCROLL_TRIGGER_PX) return;
+            this._fetchNext();
+        }
+
+        _fetchNext(onDone) {
+            if (this._done) { if (onDone) onDone(true); return; }
 
             const nextPage = this._page + 1;
             const nextUrl = this._buildNextUrl();
@@ -589,7 +598,7 @@
 
             const allRows = $$('.giveaway__row-outer-wrap');
             const lastRow = allRows[allRows.length - 1];
-            if (!lastRow) { this._loading = false; return; }
+            if (!lastRow) { this._loading = false; if (onDone) onDone(true); return; }
             const parent = lastRow.parentNode;
 
             const loader = mkEl('div', { className: 'sgfp-scroll-loader' }, [T('scroll_load', nextPage)]);
@@ -606,6 +615,7 @@
                         loader.style.color = '#4ecb71';
                         setTimeout(() => loader.remove(), TIMINGS.LOADER_REMOVE_MS);
                         this._loading = false;
+                        if (onDone) onDone(true);
                         return;
                     }
                     let insertPoint = loader;
@@ -620,6 +630,7 @@
                     this._retries = 0;  // we made it, reset the shame counter
                     this._loading = false;
                     runAll();
+                    if (onDone) onDone(false);
                 })
                 .catch(err => {
                     this._retries++;
@@ -629,14 +640,72 @@
                         this._loading = false;
                         loader.style.color = '#e05555';
                         setTimeout(() => loader.remove(), TIMINGS.ERROR_REMOVE_MS);
+                        if (onDone) onDone(true);
                     } else {
                         loader.style.color = '#c8b43c';
                         setTimeout(() => loader.remove(), TIMINGS.ERROR_REMOVE_MS);
                         // exponential backoff - sounds fancy, it's just FAIL_RESET_MS × retryCount
                         const backoff = TIMINGS.FAIL_RESET_MS * this._retries;
-                        setTimeout(() => { this._loading = false; }, backoff);
+                        setTimeout(() => { this._loading = false; if (onDone) onDone(false); }, backoff);
                     }
                 });
+        }
+
+        /* Load ALL remaining pages in sequence - no scrolling required */
+        loadAll() {
+            if (this._loadingAll) { this.stopLoadAll(); return; }
+            this._loadingAll = true;
+            this._done = false;
+            this._retries = 0;
+            const cur = document.querySelector('.pagination__navigation a.is-selected');
+            this._page = cur ? (parseInt(cur.textContent, 10) || 1) : 1;
+
+            // detect total pages from pagination
+            const allPageLinks = document.querySelectorAll('.pagination__navigation a[data-page-number]');
+            this._totalPages = 0;
+            allPageLinks.forEach(a => {
+                const n = parseInt(a.getAttribute('data-page-number'), 10);
+                if (n > this._totalPages) this._totalPages = n;
+            });
+
+            this._updateLoadAllBtn();
+            this._loadNext();
+        }
+
+        _loadNext() {
+            if (!this._loadingAll) return;
+            // update button text with progress
+            this._updateLoadAllBtn();
+
+            this._fetchNext((done) => {
+                if (done || !this._loadingAll) {
+                    this._loadingAll = false;
+                    this._updateLoadAllBtn();
+                    return;
+                }
+                // small delay between fetches to not hammer the server
+                setTimeout(() => this._loadNext(), 300);
+            });
+        }
+
+        stopLoadAll() {
+            this._loadingAll = false;
+            this._updateLoadAllBtn();
+        }
+
+        _updateLoadAllBtn() {
+            const btn = $id('sgfp-loadall');
+            if (!btn) return;
+            if (this._loadingAll) {
+                btn.textContent = T('btn_loadall_stop');
+                btn.title = T('scroll_loadall', this._page, this._totalPages);
+                btn.classList.add('sgfp-btn-active');
+            } else {
+                btn.textContent = T('btn_loadall');
+                btn.title = '';
+                btn.classList.remove('sgfp-btn-active');
+                if (this._done) { btn.disabled = true; btn.textContent = T('scroll_done'); }
+            }
         }
     }
     const autoScroller = new AutoScroller();
@@ -853,6 +922,10 @@
 .sgfp-btn:hover { background: linear-gradient(135deg, #4a7b9a, #3a6080); }
 .sgfp-btn-danger { background: linear-gradient(135deg, #5a3030, #4a2020) !important; }
 .sgfp-btn-danger:hover { background: linear-gradient(135deg, #6a3a3a, #5a2a2a) !important; }
+.sgfp-btn-active { background: linear-gradient(135deg, #8a5a20, #6a4010) !important; animation: sgfp-pulse 1.5s ease-in-out infinite; }
+.sgfp-btn-active:hover { background: linear-gradient(135deg, #9a6a30, #7a5020) !important; }
+.sgfp-btn:disabled { opacity: .5; cursor: default; pointer-events: none; }
+@keyframes sgfp-pulse { 0%,100% { opacity: 1; } 50% { opacity: .7; } }
 
 /* ── Slider ── */
 .sgfp-slider-val { display: inline-block; min-width: 36px; text-align: right; color: #7ab8e0; font-weight: 700; font-size: 0.92em; }
@@ -1133,6 +1206,7 @@ html.sgfp-dark ::-webkit-scrollbar-thumb:hover { background: #3e4450; }
             ${sw('sgfp-x-dark', T('x_dark'), C.x_darkTheme, T('x_dark_hint'))}
             <div class="sgfp-sh">${T('sh_scroll')}</div>
             ${sw('sgfp-x-scroll', T('x_scroll'), C.x_autoScroll, T('x_scroll_hint'))}
+            <button class="sgfp-btn" id="sgfp-loadall" style="margin-top:4px">${T('btn_loadall')}</button>
         </div>`;
     }
 
@@ -1257,6 +1331,7 @@ html.sgfp-dark ::-webkit-scrollbar-thumb:hover { background: #3e4450; }
         $id('sgfp-reset').addEventListener('click', () => {
             if (confirm(T('confirm_reset'))) { cfgSave(DEFAULTS); location.reload(); }
         });
+        $id('sgfp-loadall').addEventListener('click', () => autoScroller.loadAll());
 
         document.addEventListener('keydown', e => {
             if (e.altKey && e.key.toLowerCase() === 'f') {
