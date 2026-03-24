@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         128 Player
 // @namespace    https://github.com/128team/tm_scripts
-// @version      0.1.1
+// @version      0.1.2
 // @description  Кастомный видеоплеер — замена стандартных плееров на аниме-сайтах
 // @author       d08
 // @supportURL   https://github.com/128team/tm_scripts/issues
@@ -1016,7 +1016,8 @@
       video.addEventListener("progress", onProgress);
 
       // drag уже объявлен выше (общий флаг с зонами)
-      var dragPct = 0; // текущий % при перетаскивании
+      var dragPct = 0;
+      var wasPlayingBeforeDrag = false; // играло ли видео до начала перетаскивания
       function pctFromEvent(e) {
         var r = prog.getBoundingClientRect();
         var clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -1027,6 +1028,16 @@
         if (video.duration) {
           time.textContent = fmt(pct * video.duration) + " / " + fmt(video.duration);
         }
+      }
+      function startDrag(e) {
+        drag = true;
+        wasPlayingBeforeDrag = !video.paused;
+        if (wasPlayingBeforeDrag) {
+          skipNextFlash = true; // не мигать иконкой при паузе для drag
+          video.pause();
+        }
+        dragPct = pctFromEvent(e);
+        updateBarVisual(dragPct);
       }
       function stopDrag() {
         document.removeEventListener("mousemove", onDragMove, true);
@@ -1062,9 +1073,12 @@
         updateBarVisual(dragPct);
       }
       function onDragEnd() {
-        // применяем seek только при отпускании
         if (drag) {
           video.currentTime = dragPct * (video.duration || 0);
+          if (wasPlayingBeforeDrag) {
+            skipNextFlash = true; // не мигать иконкой при возобновлении
+            video.play();
+          }
         }
         stopDrag();
       }
@@ -1072,9 +1086,7 @@
       prog.addEventListener("mousedown", function (e) {
         e.preventDefault();
         e.stopPropagation();
-        drag = true;
-        dragPct = pctFromEvent(e);
-        updateBarVisual(dragPct);
+        startDrag(e);
         document.addEventListener("mousemove", onDragMove, true);
         document.addEventListener("mouseup", onDragEnd, true);
         document.addEventListener("mouseleave", onDragEnd, true);
@@ -1084,9 +1096,7 @@
       prog.addEventListener("touchstart", function (e) {
         e.preventDefault();
         e.stopPropagation();
-        drag = true;
-        dragPct = pctFromEvent(e);
-        updateBarVisual(dragPct);
+        startDrag(e);
         document.addEventListener("touchmove", onTouchDragMove, true);
         document.addEventListener("touchend", onDragEnd, true);
         document.addEventListener("touchcancel", onDragEnd, true);
