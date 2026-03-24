@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         128 Player
 // @namespace    https://github.com/128team/tm_scripts
-// @version      0.1.2
+// @version      0.1.3
 // @description  Кастомный видеоплеер — замена стандартных плееров на аниме-сайтах
 // @author       d08
 // @supportURL   https://github.com/128team/tm_scripts/issues
@@ -44,6 +44,12 @@
       ".ym-p-prog:hover{height:8px;}",
       ".ym-p-buf{position:absolute;top:0;left:0;height:100%;background:rgba(255,255,255,.18);border-radius:2px;pointer-events:none;}",
       ".ym-p-bar{position:absolute;top:0;left:0;height:100%;background:#4a9eff;border-radius:2px;pointer-events:none;transition:none;}",
+      // thumb-кружок на конце прогресс-бара
+      ".ym-p-thumb{position:absolute;top:50%;right:0;width:14px;height:14px;background:#fff;border-radius:50%;transform:translate(50%,-50%) scale(0);pointer-events:none;transition:transform .15s;box-shadow:0 0 4px rgba(0,0,0,.4);}",
+      ".ym-p-prog:hover .ym-p-thumb,.ym-p-prog.dragging .ym-p-thumb{transform:translate(50%,-50%) scale(1);}",
+      // бабл с превью таймкодом
+      ".ym-p-bubble{position:absolute;bottom:100%;left:0;transform:translateX(-50%);margin-bottom:10px;padding:4px 8px;background:rgba(20,20,30,.92);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#fff;font:600 12px/1 inherit;font-variant-numeric:tabular-nums;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .12s;z-index:12;}",
+      ".ym-p-bubble.visible{opacity:1;}",
       ".ym-p-vol{display:flex;align-items:center;gap:6px;}",
       ".ym-p-vol input{-webkit-appearance:none;appearance:none;width:70px;height:4px;background:rgba(255,255,255,.2);border-radius:2px;outline:none;cursor:pointer;}",
       ".ym-p-vol input::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;background:#fff;border-radius:50%;cursor:pointer;}",
@@ -452,6 +458,13 @@
         catch (ex) { window.top.postMessage("ym-player-pong", "*"); }
         return;
       }
+      // pong от iframe — значит грид обнаружил плеер, FAB не нужен
+      if (e.data === "ym-player-pong") {
+        managed = true;
+        var fab = document.getElementById("ym-p-fab");
+        if (fab) fab.style.display = "none";
+        return;
+      }
       if (e.data === "ym-close-player") {
         var closeBtn = document.querySelector(".ym-p-close");
         if (closeBtn) closeBtn.click();
@@ -463,6 +476,10 @@
 
     function openP(video) {
       if (document.getElementById("ym-player")) return;
+
+      // прячем FAB пока плеер открыт
+      var fab = document.getElementById("ym-p-fab");
+      if (fab) fab.style.display = "none";
 
       var wasPaused = video.paused;
       var origStyle = video.getAttribute("style") || "";
@@ -486,7 +503,13 @@
       pBuf.className = "ym-p-buf";
       var pBar = document.createElement("div");
       pBar.className = "ym-p-bar";
-      prog.append(pBuf, pBar);
+      var pThumb = document.createElement("div");
+      pThumb.className = "ym-p-thumb";
+      pBar.appendChild(pThumb);
+      var pBubble = document.createElement("div");
+      pBubble.className = "ym-p-bubble";
+      pBubble.textContent = "0:00";
+      prog.append(pBuf, pBar, pBubble);
 
       var time = document.createElement("span");
       time.className = "ym-p-time";
@@ -1017,29 +1040,49 @@
 
       // drag уже объявлен выше (общий флаг с зонами)
       var dragPct = 0;
-      var wasPlayingBeforeDrag = false; // играло ли видео до начала перетаскивания
+      var wasPlayingBeforeDrag = false;
       function pctFromEvent(e) {
         var r = prog.getBoundingClientRect();
         var clientX = e.touches ? e.touches[0].clientX : e.clientX;
         return Math.max(0, Math.min(1, (clientX - r.left) / r.width));
       }
+      function showBubble(pct) {
+        if (!video.duration) return;
+        pBubble.textContent = fmt(pct * video.duration);
+        // позиционируем бабл, не давая ему вылезти за края прогресс-бара
+        var progW = prog.offsetWidth;
+        var bubbleW = pBubble.offsetWidth || 40;
+        var rawX = pct * progW;
+        var minX = bubbleW / 2 + 2;
+        var maxX = progW - bubbleW / 2 - 2;
+        var clampedX = Math.max(minX, Math.min(maxX, rawX));
+        pBubble.style.left = clampedX + "px";
+        pBubble.classList.add("visible");
+      }
+      function hideBubble() {
+        pBubble.classList.remove("visible");
+      }
       function updateBarVisual(pct) {
         pBar.style.width = pct * 100 + "%";
+        showBubble(pct);
         if (video.duration) {
           time.textContent = fmt(pct * video.duration) + " / " + fmt(video.duration);
         }
       }
       function startDrag(e) {
         drag = true;
+        prog.classList.add("dragging");
         wasPlayingBeforeDrag = !video.paused;
         if (wasPlayingBeforeDrag) {
-          skipNextFlash = true; // не мигать иконкой при паузе для drag
+          skipNextFlash = true;
           video.pause();
         }
         dragPct = pctFromEvent(e);
         updateBarVisual(dragPct);
       }
       function stopDrag() {
+        prog.classList.remove("dragging");
+        hideBubble();
         document.removeEventListener("mousemove", onDragMove, true);
         document.removeEventListener("mouseup", onDragEnd, true);
         document.removeEventListener("mouseleave", onDragEnd, true);
@@ -1076,12 +1119,20 @@
         if (drag) {
           video.currentTime = dragPct * (video.duration || 0);
           if (wasPlayingBeforeDrag) {
-            skipNextFlash = true; // не мигать иконкой при возобновлении
+            skipNextFlash = true;
             video.play();
           }
         }
         stopDrag();
       }
+      // hover на прогресс-баре — показываем бабл с таймкодом
+      prog.addEventListener("mousemove", function (e) {
+        if (drag) return; // при drag бабл уже обновляется через updateBarVisual
+        showBubble(pctFromEvent(e));
+      });
+      prog.addEventListener("mouseleave", function () {
+        if (!drag) hideBubble();
+      });
       // mouse
       prog.addEventListener("mousedown", function (e) {
         e.preventDefault();
