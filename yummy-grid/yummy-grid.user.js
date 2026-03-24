@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YummyAnime - Grid View
 // @namespace    https://github.com/128team/tm_scripts
-// @version      1.6.7
+// @version      1.6.8
 // @description  Сетка постеров аниме на странице профиля
 // @author       d08
 // @supportURL   https://github.com/128team/tm_scripts/issues
@@ -90,6 +90,16 @@
     ".ym-gear-menu button:hover{background:rgba(255,255,255,.1);}",
     ".ym-gear-menu button svg{width:18px;height:18px;}",
     ".ym-hide{display:none!important;}",
+    // popup оценки для мобилки
+    ".ym-rate-overlay{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(2px);opacity:0;transition:opacity .2s;pointer-events:none;}",
+    ".ym-rate-overlay.open{opacity:1;pointer-events:auto;}",
+    ".ym-rate-sheet{background:#1e1e2e;border-radius:16px 16px 0 0;padding:16px 16px 24px;width:100%;max-width:400px;transform:translateY(100%);transition:transform .25s ease-out;}",
+    ".ym-rate-overlay.open .ym-rate-sheet{transform:translateY(0);}",
+    ".ym-rate-title{text-align:center;color:#999;font-size:13px;margin-bottom:12px;font-weight:600;}",
+    ".ym-rate-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;}",
+    ".ym-rate-num{background:#2a2a3e;border:2px solid transparent;border-radius:10px;color:#ccc;font-size:18px;font-weight:700;padding:14px 0;text-align:center;cursor:pointer;transition:all .15s;font-family:inherit;}",
+    ".ym-rate-num:hover,.ym-rate-num:active{background:#3a3a5e;color:#fff;border-color:#4a9eff;}",
+    ".ym-rate-num.current{border-color:#ffc107;color:#ffc107;}",
     // убийца сайдбара. querySelector с wildcard - грязно, но работает
     '.ym-no-sidebar aside,.ym-no-sidebar div[class*="sidebar"],.ym-no-sidebar div[class*="Sidebar"]{display:none!important;}',
     // мобилка: пальцы - не курсор, увеличиваем всё, чтоб не промахнуться
@@ -1332,4 +1342,66 @@
     }
     if (t > 60) clearInterval(iv);
   }, 500);
+
+  // --- мобильный popup оценки ---
+  // на touch-устройствах hover не работает, поэтому перехватываем тап на звезду
+  // и показываем popup с крупными кнопками 1-10
+  if (window.matchMedia("(pointer:coarse)").matches) {
+    var rateOverlay = document.createElement("div");
+    rateOverlay.className = "ym-rate-overlay";
+    var rateSheet = document.createElement("div");
+    rateSheet.className = "ym-rate-sheet";
+    var rateTitle = document.createElement("div");
+    rateTitle.className = "ym-rate-title";
+    rateTitle.textContent = "Оценить аниме";
+    var rateGrid = document.createElement("div");
+    rateGrid.className = "ym-rate-grid";
+    rateSheet.append(rateTitle, rateGrid);
+    rateOverlay.appendChild(rateSheet);
+    document.body.appendChild(rateOverlay);
+
+    var rateTarget = null; // .qw.nb в котором живут оригинальные .qy звёзды
+
+    for (var ri = 1; ri <= 10; ri++) {
+      (function (rating) {
+        var numBtn = document.createElement("button");
+        numBtn.className = "ym-rate-num";
+        numBtn.textContent = rating;
+        numBtn.addEventListener("click", function () {
+          if (rateTarget) {
+            var origStar = rateTarget.querySelector('.qy[data-rating="' + rating + '"]');
+            if (origStar) origStar.click();
+          }
+          closeRatePopup();
+        });
+        rateGrid.appendChild(numBtn);
+      })(ri);
+    }
+
+    function closeRatePopup() {
+      rateOverlay.classList.remove("open");
+      rateTarget = null;
+    }
+    rateOverlay.addEventListener("click", function (e) {
+      if (e.target === rateOverlay) closeRatePopup();
+    });
+
+    document.addEventListener("click", function (e) {
+      // ловим тап по звезде рейтинга (.dataRatingColored или её дочерним)
+      var el = e.target.closest(".dataRatingColored");
+      if (!el) return;
+      var starsWrap = el.querySelector(".qw");
+      if (!starsWrap) return;
+      e.preventDefault();
+      e.stopPropagation();
+      rateTarget = starsWrap;
+      // подсвечиваем текущую оценку
+      var current = el.getAttribute("data-rating");
+      var currentRound = current ? Math.round(parseFloat(current)) : 0;
+      rateGrid.querySelectorAll(".ym-rate-num").forEach(function (btn) {
+        btn.classList.toggle("current", parseInt(btn.textContent) === currentRound);
+      });
+      rateOverlay.classList.add("open");
+    }, true);
+  }
 })();
