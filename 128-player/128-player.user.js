@@ -18,7 +18,7 @@
   "use strict";
 
   // 128 player — кастомный видеоплеер для аниме (и не только)
-  // в iframe — заменяет дефолтный плеер нахуй, автоматом
+  // в iframe — заменяет дефолтный плеер, автоматом
   // на обычной странице — FAB-кнопка, юзер сам решает
   // если кто-то шлёт ping — переходим в managed-режим и слушаемся
 
@@ -41,7 +41,7 @@
       ".ym-p-btn:hover{color:#fff;background:rgba(255,255,255,.12);}",
       ".ym-p-btn svg{width:22px;height:22px;fill:currentColor;}",
       ".ym-p-prog{flex:1;height:4px;background:rgba(255,255,255,.12);border-radius:2px;cursor:pointer;position:relative;transition:height .15s;}",
-      ".ym-p-prog:hover{height:8px;}",
+      ".ym-p-prog:hover,.ym-p-prog.dragging{height:8px;}",
       ".ym-p-buf{position:absolute;top:0;left:0;height:100%;background:rgba(255,255,255,.18);border-radius:2px;pointer-events:none;}",
       ".ym-p-bar{position:absolute;top:0;left:0;height:100%;background:#4a9eff;border-radius:2px;pointer-events:none;transition:none;}",
       // thumb-кружок на конце прогресс-бара
@@ -1248,6 +1248,15 @@
 
       function onKey(e) {
         if (!document.getElementById("ym-player")) return;
+        if (e.repeat) {
+          // при зажатии разрешаем только перемотку и громкость
+          if (e.key !== "ArrowLeft" && e.key !== "ArrowRight" &&
+              e.key !== "ArrowUp" && e.key !== "ArrowDown") {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            return;
+          }
+        }
         var handled = true;
         switch (e.key) {
           case " ":
