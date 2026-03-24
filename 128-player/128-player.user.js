@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         128 Player
 // @namespace    https://github.com/128team/tm_scripts
-// @version      0.1.0
+// @version      0.1.1
 // @description  Кастомный видеоплеер — замена стандартных плееров на аниме-сайтах
 // @author       d08
 // @supportURL   https://github.com/128team/tm_scripts/issues
@@ -35,20 +35,20 @@
       '#ym-player{position:fixed!important;inset:0!important;z-index:2147483647!important;background:#000!important;display:flex!important;flex-direction:column!important;pointer-events:auto!important;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif!important;}',
       "#ym-player *{pointer-events:auto!important;}",
       "#ym-player video{flex:1;width:100%;min-height:0;object-fit:contain;background:#000;outline:none;}",
-      ".ym-p-controls{display:flex;align-items:center;gap:10px;padding:10px 16px;background:linear-gradient(transparent,rgba(0,0,0,.95));color:#ddd;font-size:13px;position:absolute;bottom:0;left:0;right:0;transition:opacity .3s;z-index:10!important;}",
+      ".ym-p-controls{display:flex;align-items:center;gap:10px;padding:12px 16px 14px;background:linear-gradient(transparent,rgba(0,0,0,.4) 30%,rgba(0,0,0,.85));color:#ddd;font-size:13px;position:absolute;bottom:0;left:0;right:0;transition:opacity .3s;z-index:10!important;}",
       ".ym-p-controls.hidden{opacity:0;pointer-events:none!important;}",
-      ".ym-p-btn{background:none;border:none;color:#ddd;cursor:pointer!important;padding:8px;border-radius:4px;display:flex;align-items:center;justify-content:center;position:relative;z-index:11!important;}",
-      ".ym-p-btn:hover{color:#fff;background:rgba(255,255,255,.1);}",
+      ".ym-p-btn{background:none;border:none;color:#ccc;cursor:pointer!important;padding:8px;border-radius:6px;display:flex;align-items:center;justify-content:center;position:relative;z-index:11!important;transition:all .15s;}",
+      ".ym-p-btn:hover{color:#fff;background:rgba(255,255,255,.12);}",
       ".ym-p-btn svg{width:22px;height:22px;fill:currentColor;}",
-      ".ym-p-prog{flex:1;height:6px;background:rgba(255,255,255,.15);border-radius:3px;cursor:pointer;position:relative;}",
-      ".ym-p-prog:hover{height:10px;}",
-      ".ym-p-buf{position:absolute;top:0;left:0;height:100%;background:rgba(255,255,255,.15);border-radius:3px;pointer-events:none;}",
-      ".ym-p-bar{position:absolute;top:0;left:0;height:100%;background:#4a9eff;border-radius:3px;pointer-events:none;}",
+      ".ym-p-prog{flex:1;height:4px;background:rgba(255,255,255,.12);border-radius:2px;cursor:pointer;position:relative;transition:height .15s;}",
+      ".ym-p-prog:hover{height:8px;}",
+      ".ym-p-buf{position:absolute;top:0;left:0;height:100%;background:rgba(255,255,255,.18);border-radius:2px;pointer-events:none;}",
+      ".ym-p-bar{position:absolute;top:0;left:0;height:100%;background:#4a9eff;border-radius:2px;pointer-events:none;transition:none;}",
       ".ym-p-vol{display:flex;align-items:center;gap:6px;}",
       ".ym-p-vol input{-webkit-appearance:none;appearance:none;width:70px;height:4px;background:rgba(255,255,255,.2);border-radius:2px;outline:none;cursor:pointer;}",
       ".ym-p-vol input::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;background:#fff;border-radius:50%;cursor:pointer;}",
-      ".ym-p-time{font-size:12px;color:#aaa;font-variant-numeric:tabular-nums;white-space:nowrap;min-width:90px;text-align:center;}",
-      ".ym-p-speed{font-size:12px;color:#aaa;cursor:pointer;padding:2px 6px;border-radius:4px;user-select:none;}",
+      ".ym-p-time{font-size:12px;color:#999;font-variant-numeric:tabular-nums;white-space:nowrap;min-width:90px;text-align:center;}",
+      ".ym-p-speed{font-size:12px;color:#999;cursor:pointer;padding:3px 8px;border-radius:4px;user-select:none;transition:all .15s;}",
       ".ym-p-speed:hover{color:#fff;background:rgba(255,255,255,.1);}",
       ".ym-p-close{position:absolute!important;top:8px;right:10px;z-index:100!important;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,.15);border-radius:50%;width:36px;height:36px;display:flex!important;align-items:center;justify-content:center;cursor:pointer!important;color:#ccc;transition:all .2s;pointer-events:auto!important;}",
       ".ym-p-close:hover{background:rgba(200,40,40,.8);color:#fff;}",
@@ -70,8 +70,8 @@
       ".ym-p-buffering.visible{opacity:1;}",
       ".ym-p-buffering .ym-spinner{width:48px;height:48px;border:3px solid rgba(255,255,255,.15);border-top-color:#4a9eff;border-radius:50%;animation:ym-spin 0.8s linear infinite;}",
       // skip-кнопка
-      ".ym-p-skip{position:absolute!important;bottom:60px;right:16px;z-index:50!important;padding:8px 18px;background:rgba(255,255,255,.12);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.25);border-radius:8px;color:#fff;font:600 13px/1 inherit;cursor:pointer!important;transition:all .2s;display:none;pointer-events:auto!important;}",
-      ".ym-p-skip:hover{background:rgba(255,255,255,.25);border-color:rgba(255,255,255,.5);}",
+      ".ym-p-skip{position:absolute!important;bottom:64px;right:16px;z-index:50!important;padding:10px 20px;background:rgba(74,158,255,.15);backdrop-filter:blur(10px);border:1px solid rgba(74,158,255,.35);border-radius:8px;color:#fff;font:600 13px/1 inherit;cursor:pointer!important;transition:all .2s;display:none;pointer-events:auto!important;}",
+      ".ym-p-skip:hover{background:rgba(74,158,255,.3);border-color:rgba(74,158,255,.6);transform:translateX(-2px);}",
       ".ym-p-skip.visible{display:block;}",
       // popup-меню (quality, speed)
       ".ym-p-popup{position:relative;z-index:11!important;}",
@@ -80,6 +80,14 @@
       ".ym-p-popup-item{display:block;width:100%;padding:6px 14px;background:none;border:none;color:#aaa;font:12px/1 inherit;cursor:pointer!important;text-align:left;white-space:nowrap;}",
       ".ym-p-popup-item:hover{background:rgba(255,255,255,.08);color:#fff;}",
       ".ym-p-popup-item.active{color:#4a9eff;font-weight:700;}",
+      // автопропуск toggle
+      ".ym-p-autoskip{display:flex;align-items:center;gap:5px;cursor:pointer;padding:2px 8px;border-radius:4px;user-select:none;font:600 11px/1 inherit;color:#666;transition:all .2s;}",
+      ".ym-p-autoskip:hover{color:#aaa;background:rgba(255,255,255,.06);}",
+      ".ym-p-autoskip.on{color:#4a9eff;}",
+      ".ym-p-autoskip.on:hover{color:#6dc0ff;}",
+      ".ym-p-autoskip svg{width:16px;height:16px;fill:currentColor;}",
+      ".ym-p-autoskip-dot{width:6px;height:6px;border-radius:50%;background:#555;transition:background .2s;}",
+      ".ym-p-autoskip.on .ym-p-autoskip-dot{background:#4a9eff;}",
       // loading-оверлей
       '#ym-p-loading{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;color:#ddd;font:600 16px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}',
       "#ym-p-loading .ym-spinner{width:40px;height:40px;border:3px solid rgba(255,255,255,.15);border-top-color:#4a9eff;border-radius:50%;animation:ym-spin 0.8s linear infinite;}",
@@ -96,6 +104,8 @@
       ".ym-p-time{font-size:11px;min-width:70px;}",
       ".ym-p-speed{font-size:13px;padding:6px 10px;}",
       ".ym-p-vol{display:none!important;}", // скрываем громкость на мобилке (iOS не поддерживает)
+      ".ym-p-autoskip{padding:4px 10px;}",
+      ".ym-p-autoskip span{font-size:12px;}",
       ".ym-p-popup-item{padding:10px 16px;font-size:14px;}",
       ".ym-p-zone-icon svg{width:44px;height:44px;}",
       ".ym-p-zone-icon span{font-size:14px;}",
@@ -121,6 +131,7 @@
       rew5: '<svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/><text x="12" y="14.5" text-anchor="middle" font-size="8" font-weight="700" fill="currentColor" font-family="sans-serif">5</text></svg>',
       fwd5: '<svg viewBox="0 0 24 24"><path d="M12 5V1l5 5-5 5V7c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6h2c0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8z"/><text x="12" y="14.5" text-anchor="middle" font-size="8" font-weight="700" fill="currentColor" font-family="sans-serif">5</text></svg>',
       next: '<svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>',
+      autoSkip: '<svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12z"/><path d="M16 18l8.5-6L16 6v12z" opacity=".5"/></svg>',
     };
     var SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 
@@ -149,6 +160,19 @@
         localStorage.setItem("ymp-quality", q);
       } catch (ex) {}
     }
+    function getAutoSkip() {
+      try {
+        return localStorage.getItem("ymp-autoskip") === "1";
+      } catch (ex) {
+        return false;
+      }
+    }
+    function saveAutoSkip(v) {
+      try {
+        localStorage.setItem("ymp-autoskip", v ? "1" : "0");
+      } catch (ex) {}
+    }
+
     // таймкод: ключ = pathname из referrer или location
     function getTimeKey() {
       try {
@@ -428,6 +452,11 @@
         catch (ex) { window.top.postMessage("ym-player-pong", "*"); }
         return;
       }
+      if (e.data === "ym-close-player") {
+        var closeBtn = document.querySelector(".ym-p-close");
+        if (closeBtn) closeBtn.click();
+        return;
+      }
       if (e.data !== "ym-open-player") return;
       activatePlayer();
     });
@@ -531,6 +560,27 @@
         closeP();
         window.top.postMessage("ym-next-episode", "*");
       });
+
+      // --- автопропуск toggle ---
+      var autoSkipOn = getAutoSkip();
+      var autoSkipWrap = document.createElement("div");
+      autoSkipWrap.className = "ym-p-autoskip" + (autoSkipOn ? " on" : "");
+      autoSkipWrap.title = "Автопропуск интро/эндинг + след. серия (A)";
+      autoSkipWrap.innerHTML = PICO.autoSkip + '<span>Авто</span><div class="ym-p-autoskip-dot"></div>';
+      autoSkipWrap.addEventListener("click", function (e) {
+        e.stopPropagation();
+        autoSkipOn = !autoSkipOn;
+        autoSkipWrap.classList.toggle("on", autoSkipOn);
+        saveAutoSkip(autoSkipOn);
+      });
+
+      // авто-переключение на следующую серию по окончанию видео
+      function onVideoEnded() {
+        if (autoSkipOn) {
+          bNext.click();
+        }
+      }
+      video.addEventListener("ended", onVideoEnded);
 
       // --- quality popup ---
       var qWrap = document.createElement("div");
@@ -693,6 +743,7 @@
         prog,
         time,
         vw,
+        autoSkipWrap,
         qWrap,
         spdWrap,
         bPip,
@@ -900,8 +951,11 @@
       var lastTimeSave = 0;
       function onTimeUpdate() {
         if (!video.duration) return;
-        pBar.style.width = (video.currentTime / video.duration) * 100 + "%";
-        time.textContent = fmt(video.currentTime) + " / " + fmt(video.duration);
+        // не перезаписываем бар пока юзер тянет
+        if (!drag) {
+          pBar.style.width = (video.currentTime / video.duration) * 100 + "%";
+          time.textContent = fmt(video.currentTime) + " / " + fmt(video.duration);
+        }
         // сохраняем таймкод каждые 5 секунд
         var now = Date.now();
         if (now - lastTimeSave > 5000) {
@@ -922,8 +976,13 @@
             }
           }
           if (activeSkip) {
-            skipBtn.textContent = activeSkip.label;
-            skipBtn.classList.add("visible");
+            // автопропуск: сразу скипаем
+            if (autoSkipOn) {
+              video.currentTime = activeSkip.end;
+            } else {
+              skipBtn.textContent = activeSkip.label;
+              skipBtn.classList.add("visible");
+            }
             origSkipRef = null;
           } else {
             skipBtn.classList.remove("visible");
@@ -932,9 +991,14 @@
           // skip: режим 2 — зеркалим оригинальную кнопку (alloha и др.)
           var origBtn = findOrigSkipBtn();
           if (origBtn) {
-            origSkipRef = origBtn;
-            skipBtn.textContent = origBtn.textContent.trim() || "Пропустить";
-            skipBtn.classList.add("visible");
+            // автопропуск: кликаем оригинальную кнопку
+            if (autoSkipOn) {
+              origBtn.click();
+            } else {
+              origSkipRef = origBtn;
+              skipBtn.textContent = origBtn.textContent.trim() || "Пропустить";
+              skipBtn.classList.add("visible");
+            }
           } else {
             origSkipRef = null;
             skipBtn.classList.remove("visible");
@@ -952,11 +1016,17 @@
       video.addEventListener("progress", onProgress);
 
       // drag уже объявлен выше (общий флаг с зонами)
-      function seekFromEvent(e) {
+      var dragPct = 0; // текущий % при перетаскивании
+      function pctFromEvent(e) {
         var r = prog.getBoundingClientRect();
         var clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        var pct = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
-        video.currentTime = pct * (video.duration || 0);
+        return Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+      }
+      function updateBarVisual(pct) {
+        pBar.style.width = pct * 100 + "%";
+        if (video.duration) {
+          time.textContent = fmt(pct * video.duration) + " / " + fmt(video.duration);
+        }
       }
       function stopDrag() {
         document.removeEventListener("mousemove", onDragMove, true);
@@ -978,7 +1048,8 @@
         }
         e.preventDefault();
         e.stopPropagation();
-        seekFromEvent(e);
+        dragPct = pctFromEvent(e);
+        updateBarVisual(dragPct);
       }
       function onTouchDragMove(e) {
         if (!drag) {
@@ -987,9 +1058,14 @@
         }
         e.preventDefault();
         e.stopPropagation();
-        seekFromEvent(e);
+        dragPct = pctFromEvent(e);
+        updateBarVisual(dragPct);
       }
       function onDragEnd() {
+        // применяем seek только при отпускании
+        if (drag) {
+          video.currentTime = dragPct * (video.duration || 0);
+        }
         stopDrag();
       }
       // mouse
@@ -997,7 +1073,8 @@
         e.preventDefault();
         e.stopPropagation();
         drag = true;
-        seekFromEvent(e);
+        dragPct = pctFromEvent(e);
+        updateBarVisual(dragPct);
         document.addEventListener("mousemove", onDragMove, true);
         document.addEventListener("mouseup", onDragEnd, true);
         document.addEventListener("mouseleave", onDragEnd, true);
@@ -1008,7 +1085,8 @@
         e.preventDefault();
         e.stopPropagation();
         drag = true;
-        seekFromEvent(e);
+        dragPct = pctFromEvent(e);
+        updateBarVisual(dragPct);
         document.addEventListener("touchmove", onTouchDragMove, true);
         document.addEventListener("touchend", onDragEnd, true);
         document.addEventListener("touchcancel", onDragEnd, true);
@@ -1076,6 +1154,7 @@
         video.removeEventListener("playing", onCanPlay);
         video.removeEventListener("seeked", onCanPlay);
         video.removeEventListener("canplay", onCanPlay);
+        video.removeEventListener("ended", onVideoEnded);
         if (bufTimer) {
           clearTimeout(bufTimer);
           bufTimer = null;
@@ -1091,7 +1170,7 @@
         document.removeEventListener("webkitfullscreenchange", syncFs);
         video.removeEventListener("webkitbeginfullscreen", syncFs);
         video.removeEventListener("webkitendfullscreen", syncFs);
-        document.removeEventListener("keydown", onKey);
+        document.removeEventListener("keydown", onKey, true);
         document.removeEventListener("click", onDocClickPopup);
         // чистим интервалы сбора качества
         qIntervals.forEach(function (iv) {
@@ -1108,29 +1187,25 @@
 
       function onKey(e) {
         if (!document.getElementById("ym-player")) return;
+        var handled = true;
         switch (e.key) {
           case " ":
           case "k":
-            e.preventDefault();
             video.paused ? video.play() : video.pause();
             break;
           case "ArrowLeft":
-            e.preventDefault();
             video.currentTime -= 5;
             flashIcon(icoL);
             break;
           case "ArrowRight":
-            e.preventDefault();
             video.currentTime += 5;
             flashIcon(icoR);
             break;
           case "ArrowUp":
-            e.preventDefault();
             video.volume = Math.min(1, video.volume + 0.05);
             vol.value = video.volume;
             break;
           case "ArrowDown":
-            e.preventDefault();
             video.volume = Math.max(0, video.volume - 0.05);
             vol.value = video.volume;
             break;
@@ -1154,15 +1229,24 @@
             );
             break;
           case "N":
-            e.preventDefault();
             bNext.click();
-            break; // Shift+N
+            break;
+          case "a":
+            autoSkipWrap.click();
+            break;
           case "Escape":
             closeP();
             break;
+          default:
+            handled = false;
+        }
+        if (handled) {
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
         }
       }
-      document.addEventListener("keydown", onKey);
+      document.addEventListener("keydown", onKey, true);
     }
 
     // standalone: если за 2.5с никто не пингнул — мы сами по себе

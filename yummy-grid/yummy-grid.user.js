@@ -929,6 +929,15 @@
       });
     }
 
+    function sendClosePlayer() {
+      var iframes = document.querySelectorAll("iframe");
+      iframes.forEach(function (iframe) {
+        try {
+          iframe.contentWindow.postMessage("ym-close-player", "*");
+        } catch (ex) {}
+      });
+    }
+
     function sendPlayerPing() {
       var iframes = document.querySelectorAll("iframe");
       iframes.forEach(function (iframe) {
@@ -947,6 +956,7 @@
           localStorage.setItem("ymg-player", val ? "1" : "0");
         } catch (ex) {}
         if (val && playerDetected) sendOpenPlayer();
+        if (!val) sendClosePlayer();
       },
       "Всегда открывать в своём плеере",
     );
