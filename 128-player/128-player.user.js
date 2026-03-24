@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         128 Player
 // @namespace    https://github.com/128team/tm_scripts
-// @version      0.1.4
+// @version      0.1.5
 // @description  Кастомный видеоплеер — замена стандартных плееров на аниме-сайтах
 // @author       d08
 // @supportURL   https://github.com/128team/tm_scripts/issues
@@ -1232,6 +1232,7 @@
         video.removeEventListener("webkitbeginfullscreen", syncFs);
         video.removeEventListener("webkitendfullscreen", syncFs);
         document.removeEventListener("keydown", onKey, true);
+        document.removeEventListener("keyup", onKeyUp, true);
         document.removeEventListener("click", onDocClickPopup);
         // чистим интервалы сбора качества
         qIntervals.forEach(function (iv) {
@@ -1317,6 +1318,19 @@
         }
       }
       document.addEventListener("keydown", onKey, true);
+      // блокируем keyup для тех же клавиш — оригинальный плеер может слушать keyup
+      function onKeyUp(e) {
+        if (!document.getElementById("ym-player")) return;
+        switch (e.key) {
+          case " ": case "k": case "ArrowLeft": case "ArrowRight":
+          case "ArrowUp": case "ArrowDown": case "f": case "p":
+          case "m": case "s": case "n": case "N": case "a": case "Escape":
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+        }
+      }
+      document.addEventListener("keyup", onKeyUp, true);
     }
 
     // standalone: если за 2.5с никто не пингнул — мы сами по себе
