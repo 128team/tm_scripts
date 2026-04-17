@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YummyAnime - Grid View
 // @namespace    https://github.com/128team/tm_scripts
-// @version      1.6.9
+// @version      1.7.0
 // @description  Сетка постеров аниме на странице профиля
 // @author       d08
 // @supportURL   https://github.com/128team/tm_scripts/issues
@@ -90,8 +90,10 @@
     ".ym-gear-menu button:hover{background:rgba(255,255,255,.1);}",
     ".ym-gear-menu button svg{width:18px;height:18px;}",
     ".ym-hide{display:none!important;}",
-    // фикс оценки на мобилке: тап toggle вместо hover
-    "@media(pointer:coarse){.dataRatingColored .qw{display:none!important;}.dataRatingColored.ym-rate-open .qw{display:flex!important;}.dataRatingColored.ym-rate-open .qy{padding:6px!important;}}",
+    // рейтинг-попап: React рендерит .jH внутри .dataRatingColored по своему hover,
+    // мы перехватываем видимость — скрыто всегда, показано только по нашему классу.
+    ".dataRatingColored > .jH{display:none!important;}",
+    ".dataRatingColored.ym-rate-open > .jH{display:flex!important;}",
     // убийца сайдбара. querySelector с wildcard - грязно, но работает
     '.ym-no-sidebar aside,.ym-no-sidebar div[class*="sidebar"],.ym-no-sidebar div[class*="Sidebar"]{display:none!important;}',
     // мобилка: пальцы - не курсор, увеличиваем всё, чтоб не промахнуться
@@ -236,11 +238,19 @@
 
     const statusEl = li.querySelector("span[data-status]");
     if (statusEl) {
-      d.status = parseStatus(statusEl.getAttribute("title") || "");
+      // сайт мигрировал с title=... на data-tooltip-content=... — читаем новое, старое оставляем fallback
+      const tip =
+        statusEl.getAttribute("data-tooltip-content") ||
+        statusEl.getAttribute("title") ||
+        "";
+      d.status = parseStatus(tip);
       d.isOngoing = statusEl.getAttribute("data-status") === "1";
     }
 
-    const ratingEl = li.querySelector("span[data-balloon]");
+    // рейтинг аниме: data-balloon умер, теперь это data-tooltip-content="Рейтинг аниме"
+    const ratingEl =
+      li.querySelector('span[data-tooltip-content="Рейтинг аниме"]') ||
+      li.querySelector("span[data-balloon]");
     if (ratingEl) {
       const raw = ratingEl.textContent.replace(/[^\d.]/g, "");
       if (raw && parseFloat(raw) > 0) d.rating = raw;
@@ -264,13 +274,17 @@
         sp.hasAttribute("data-id")
       )
         continue;
+      // новая обёртка тултипов — пропускаем рейтинг/сердечко/статус как самостоятельные span'ы
+      const tip = sp.getAttribute("data-tooltip-content") || "";
+      if (tip === "Рейтинг аниме" || tip === "Любимое" || tip.startsWith("Статус"))
+        continue;
       if (sp.classList.contains("nz")) continue; // "3д. 22ч." - это не название аниме, это твой дедлайн
       if (sp.querySelector("svg") && !sp.querySelector("span")) continue;
       // берём textContent, но вырезаем текст дочерних элементов которые мы бы пропустили
       // (таймер .nz, score [data-rating] и пр.), иначе "название3д. 22ч.0"
       let txt = sp.textContent.trim();
       const junk = sp.querySelectorAll(
-        ".nz, [data-rating], [data-balloon], [data-status], [data-id]",
+        '.nz, [data-rating], [data-balloon], [data-status], [data-id], [data-tooltip-content="Рейтинг аниме"], [data-tooltip-content="Любимое"]',
       );
       for (let j = 0; j < junk.length; j++) {
         const junkTxt = junk[j].textContent;
@@ -291,22 +305,11 @@
     if (d.score && d.title.endsWith(d.score))
       d.title = d.title.slice(0, -d.score.length).trim();
 
-    const svgs = li.querySelectorAll("a svg path");
-    for (let i = 0; i < svgs.length; i++) {
-      const pathD = svgs[i].getAttribute("d") || "";
-      // M18.4 - начало SVG-path сердечка. да, мы определяем иконку по первым байтам path.
-      // нормальные люди используют классы, но YummyAnime не нормальные люди. и мы тоже
-      if (pathD.indexOf("M18.4") === 0) {
-        const parentSpan = svgs[i].closest("span");
-        if (
-          parentSpan &&
-          !parentSpan.hasAttribute("data-rating") &&
-          !parentSpan.hasAttribute("data-balloon")
-        ) {
-          d.fav = true;
-          break;
-        }
-      }
+    // «в любимых» — слот сердечка теперь есть ВСЕГДА (data-tooltip-content="Любимое"),
+    // но у не-fav он скрыт через visibility:hidden. Используем getComputedStyle как источник правды.
+    const favSlot = li.querySelector('[data-tooltip-content="Любимое"]');
+    if (favSlot && getComputedStyle(favSlot).visibility !== "hidden") {
+      d.fav = true;
     }
 
     const btns = li.querySelectorAll("button[data-id]");
@@ -1026,26 +1029,54 @@
     window.addEventListener("message", function (e) {
       if (e.data !== "ym-next-episode") return;
 
-      // yummyani.me: серии — div.sy[data-selected], активная имеет data-selected="1"
-      var active = document.querySelector('div.sy[data-selected="1"]');
-      if (active) {
-        // parent = .sB, nextSibling = следующий .sB, внутри — div.sy
-        var parentSB = active.closest(".sB");
-        var nextSB = parentSB && parentSB.nextElementSibling;
-        var nextEp = nextSB && nextSB.querySelector("div.sy");
-        if (nextEp) {
-          nextEp.click();
-          console.log(
-            "[128 Player] переключение на серию",
-            nextEp.textContent.trim(),
-          );
-          // после переключения — автоматически открываем плеер через 2.5с
-          setTimeout(sendOpenPlayer, 2500);
-        } else {
-          console.log("[128 Player] это последняя серия");
+      // yummyani.me: активная серия — элемент с data-selected="1". Классы .zy/.zB
+      // генерируемые, опираться на них нельзя. Важно: на странице есть ДРУГИЕ
+      // [data-selected] элементы (вкладки "Просмотр/Описание" и т. п.) — фильтруем
+      // строго по textContent = номер серии (чистое число), иначе можно случайно
+      // кликнуть соседний таб и уйти со страницы видео.
+      var EPISODE_NUM_RE = /^\s*\d{1,4}\s*$/;
+      var allSelected = document.querySelectorAll('[data-selected="1"]');
+      var active = null;
+      for (var ai = 0; ai < allSelected.length; ai++) {
+        if (EPISODE_NUM_RE.test(allSelected[ai].textContent || "")) {
+          active = allSelected[ai];
+          break;
         }
-      } else {
+      }
+      if (!active) {
         console.log("[128 Player] активная серия не найдена");
+        return;
+      }
+
+      // поднимаемся от активной серии до её прямого родителя в списке серий
+      // (у этого родителя обычно 5+ детей — по штуке на серию)
+      var direct = active;
+      while (
+        direct.parentElement &&
+        direct.parentElement.children.length < 5
+      ) {
+        direct = direct.parentElement;
+      }
+      // идём вперёд по siblings и ищем следующий элемент серии
+      var nextWrap = direct.nextElementSibling;
+      var nextEp = null;
+      while (nextWrap && !nextEp) {
+        var cand = nextWrap.hasAttribute("data-selected")
+          ? nextWrap
+          : nextWrap.querySelector("[data-selected]");
+        if (cand && EPISODE_NUM_RE.test(cand.textContent || "")) nextEp = cand;
+        if (!nextEp) nextWrap = nextWrap.nextElementSibling;
+      }
+      if (nextEp) {
+        nextEp.click();
+        console.log(
+          "[128 Player] переключение на серию",
+          nextEp.textContent.trim(),
+        );
+        // после переключения — автоматически открываем плеер через 2.5с
+        setTimeout(sendOpenPlayer, 2500);
+      } else {
+        console.log("[128 Player] это последняя серия");
       }
     });
 
@@ -1335,34 +1366,60 @@
     if (t > 60) clearInterval(iv);
   }, 500);
 
-  // --- фикс оценки на мобилке ---
-  // hover не работает на touch — делаем toggle по тапу
-  if (window.matchMedia("(pointer:coarse)").matches) {
-    var openRating = null; // текущий открытый .dataRatingColored
-    document.addEventListener("click", function (e) {
-      var ratingEl = e.target.closest(".dataRatingColored");
-      // тап по звезде оценки (.qy) — пропускаем, пусть сайт обработает
-      if (e.target.closest(".qy")) return;
-      if (ratingEl) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (openRating === ratingEl) {
-          // повторный тап — закрываем
-          ratingEl.classList.remove("ym-rate-open");
-          openRating = null;
-        } else {
-          // закрываем предыдущий, открываем новый
-          if (openRating) openRating.classList.remove("ym-rate-open");
-          ratingEl.classList.add("ym-rate-open");
-          openRating = ratingEl;
+  // --- popup выставления оценки: toggle по клику (ПК + мобилка) ---
+  // раньше на ПК попап со звёздами 1–10 открывался по hover курсором — неудобно
+  // и не работает на touch. Подход: попап (.jH) React рендерит внутри
+  // .dataRatingColored при своём hover (reagentный, не через dispatchEvent),
+  // мы НЕ ПЫТАЕМСЯ этот рендер подавить — просто в CSS всегда скрываем .jH,
+  // а по клику добавляем класс .ym-rate-open, и CSS показывает попап.
+  // Когда юзер выбирает оценку (клик по .jL[data-rating]) или тыкает мимо —
+  // класс снимается с задержкой, чтобы клик по звёздочке успел обработаться.
+  (function initRatingToggle() {
+    var openEl = null;
+    var closeTimer = null;
+
+    function close() {
+      clearTimeout(closeTimer);
+      if (!openEl) return;
+      openEl.classList.remove("ym-rate-open");
+      openEl = null;
+    }
+
+    function open(el) {
+      close();
+      openEl = el;
+      el.classList.add("ym-rate-open");
+    }
+
+    document.addEventListener(
+      "click",
+      function (e) {
+        var rateStar = e.target.closest(".jL[data-rating]");
+        if (rateStar && openEl && openEl.contains(rateStar)) {
+          // клик по звезде 1–10 в открытом попапе — пусть сайт обработает,
+          // а мы просто закроем попап с небольшой задержкой
+          clearTimeout(closeTimer);
+          closeTimer = setTimeout(close, 200);
+          return;
         }
-        return;
-      }
-      // тап вне — закрываем
-      if (openRating) {
-        openRating.classList.remove("ym-rate-open");
-        openRating = null;
-      }
-    }, true);
-  }
+
+        var anchor = e.target.closest(".dataRatingColored");
+        if (anchor) {
+          // клик по самой плашке рейтинга — toggle
+          e.preventDefault();
+          e.stopPropagation();
+          if (openEl === anchor) close();
+          else open(anchor);
+          return;
+        }
+
+        // клик вне — закрываем
+        if (openEl) {
+          clearTimeout(closeTimer);
+          closeTimer = setTimeout(close, 150);
+        }
+      },
+      true,
+    );
+  })();
 })();
