@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         128 Player
 // @namespace    https://github.com/128team/tm_scripts
-// @version      0.1.5
+// @version      0.2.0
 // @description  Кастомный видеоплеер — замена стандартных плееров на аниме-сайтах
 // @author       d08
 // @supportURL   https://github.com/128team/tm_scripts/issues
@@ -86,6 +86,12 @@
       ".ym-p-popup-item{display:block;width:100%;padding:6px 14px;background:none;border:none;color:#aaa;font:12px/1 inherit;cursor:pointer!important;text-align:left;white-space:nowrap;}",
       ".ym-p-popup-item:hover{background:rgba(255,255,255,.08);color:#fff;}",
       ".ym-p-popup-item.active{color:#4a9eff;font-weight:700;}",
+      // секции внутри объединённого settings dropdown (качество/скорость/авто)
+      ".ym-p-settings-menu{min-width:130px;padding:2px 0;}",
+      ".ym-p-section+.ym-p-section{border-top:1px solid rgba(255,255,255,.08);margin-top:3px;padding-top:3px;}",
+      ".ym-p-section-title{padding:5px 14px 3px;color:#666;font:700 10px/1 inherit;text-transform:uppercase;letter-spacing:.6px;}",
+      ".ym-p-settings-btn svg{width:18px;height:18px;fill:currentColor;display:block;}",
+      ".ym-p-settings-btn{display:flex;align-items:center;padding:4px 6px;}",
       // автопропуск toggle
       ".ym-p-autoskip{display:flex;align-items:center;gap:5px;cursor:pointer;padding:2px 8px;border-radius:4px;user-select:none;font:600 11px/1 inherit;color:#666;transition:all .2s;}",
       ".ym-p-autoskip:hover{color:#aaa;background:rgba(255,255,255,.06);}",
@@ -138,6 +144,7 @@
       fwd5: '<svg viewBox="0 0 24 24"><path d="M12 5V1l5 5-5 5V7c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6h2c0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8z"/><text x="12" y="14.5" text-anchor="middle" font-size="8" font-weight="700" fill="currentColor" font-family="sans-serif">5</text></svg>',
       next: '<svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>',
       autoSkip: '<svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12z"/><path d="M16 18l8.5-6L16 6v12z" opacity=".5"/></svg>',
+      gear: '<svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94 0 .31.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>',
     };
     var SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 
@@ -348,43 +355,11 @@
         return;
       }
 
-      // видео не готово — показываем loading и запускаем оригинальный плеер
-      var loading = document.createElement("div");
-      loading.id = "ym-p-loading";
-      loading.innerHTML =
-        '<div class="ym-spinner"></div><div>Загрузка видео...</div>';
-      document.body.appendChild(loading);
-
-      // кликаем play в оригинальном плеере
-      var playSelectors =
-        '.play_button, .vjs-big-play-button, .fp-play, [data-allplay="playpause"], [data-allplay="play"], .allplay__play, .video_play_button, [class*="play-btn"], [class*="play_btn"], .play-button, button[aria-label="Play"]';
-      var playBtns = document.querySelectorAll(playSelectors);
-      playBtns.forEach(function (b) {
-        b.click();
-      });
-
-      // также пробуем video.play() напрямую
-      var vid = document.querySelector("video:not(.rmp-ad-vast-video-player)");
-      if (vid) {
-        try {
-          vid.play().catch(function () {});
-        } catch (ex) {}
-      }
-
-      // если play кнопку не нашли — клик по центру (по видео-контейнеру)
-      if (!playBtns.length) {
-        var center = document.elementFromPoint(
-          window.innerWidth / 2,
-          window.innerHeight / 2,
-        );
-        if (center && center !== document.body) center.click();
-      }
-      console.log(
-        "[128 Player] запуск воспроизведения, play кнопок:",
-        playBtns.length,
-        "video:",
-        !!vid,
-      );
+      // НЕ кликаем play в оригинальном плеере и НЕ показываем свой loading —
+      // оба действия ломают VAST/HLS-цепочку allplay и выбивают видео в цикл
+      // adtagstartloading. Вместо этого: пользователь сам тапает play на плеере
+      // сайта. Как только видео заиграет (readyState ≥ 2), наш pollTimer /
+      // MutationObserver подхватит его и поднимет overlay 128 Player поверх.
 
       // закрытие loading по Escape
       function onEscLoading(ev) {
@@ -412,15 +387,12 @@
         return false;
       }
 
-      // повторяем клик по play на попытках 3, 7, 12 (кодик может быть не готов)
+      // просто ждём пока видео станет готовым. НЕ ретраим clickPlayOnce —
+      // повторные клики во время загрузки HLS ломают SourceBuffer
+      // (audio bufferAppendError → recoverMediaError → "по кадрово"-проигрывание).
       var attempts = 0;
       var pollTimer = setInterval(function () {
         attempts++;
-        if (attempts === 3 || attempts === 7 || attempts === 12) {
-          document.querySelectorAll(playSelectors).forEach(function (b) {
-            b.click();
-          });
-        }
         if (onVideoReady() || attempts >= 50) {
           clearInterval(pollTimer);
           if (attempts >= 50) {
@@ -528,9 +500,6 @@
 
       var savedSpd = getSavedSpeed();
       var targetSpeed = savedSpd;
-      var spd = document.createElement("span");
-      spd.className = "ym-p-speed";
-      spd.textContent = savedSpd + "x";
       video.playbackRate = savedSpd;
       // защита от сброса скорости оригинальным плеером
       function onRateChange() {
@@ -584,18 +553,18 @@
         window.top.postMessage("ym-next-episode", "*");
       });
 
-      // --- автопропуск toggle ---
+      // --- автопропуск: только state. UI — в settings-dropdown (см. ниже).
+      // _asItemRef выставится, когда settings-пункт будет создан.
       var autoSkipOn = getAutoSkip();
-      var autoSkipWrap = document.createElement("div");
-      autoSkipWrap.className = "ym-p-autoskip" + (autoSkipOn ? " on" : "");
-      autoSkipWrap.title = "Автопропуск интро/эндинг + след. серия (A)";
-      autoSkipWrap.innerHTML = PICO.autoSkip + '<span>Авто</span><div class="ym-p-autoskip-dot"></div>';
-      autoSkipWrap.addEventListener("click", function (e) {
-        e.stopPropagation();
+      var _asItemRef = null;
+      function toggleAutoSkip() {
         autoSkipOn = !autoSkipOn;
-        autoSkipWrap.classList.toggle("on", autoSkipOn);
         saveAutoSkip(autoSkipOn);
-      });
+        if (_asItemRef) {
+          _asItemRef.classList.toggle("active", autoSkipOn);
+          _asItemRef.textContent = autoSkipOn ? "✓ Включён" : "Выключен";
+        }
+      }
 
       // авто-переключение на следующую серию по окончанию видео
       function onVideoEnded() {
@@ -605,21 +574,80 @@
       }
       video.addEventListener("ended", onVideoEnded);
 
-      // --- quality popup ---
-      var qWrap = document.createElement("div");
-      qWrap.className = "ym-p-popup";
-      var qBtn = document.createElement("span");
-      qBtn.className = "ym-p-speed";
-      qBtn.textContent = "HD";
-      var qMenu = document.createElement("div");
-      qMenu.className = "ym-p-popup-menu";
-      qWrap.append(qBtn, qMenu);
-      qWrap.style.display = "none";
+      // --- единый settings dropdown (качество / скорость / автопропуск) ---
+      // одна шестерёнка в баре — клик раскрывает popup с тремя секциями.
+      var settingsWrap = document.createElement("div");
+      settingsWrap.className = "ym-p-popup";
+      var settingsBtn = document.createElement("span");
+      settingsBtn.className = "ym-p-speed ym-p-settings-btn";
+      settingsBtn.title = "Настройки";
+      settingsBtn.innerHTML = PICO.gear;
+      var settingsMenu = document.createElement("div");
+      settingsMenu.className = "ym-p-popup-menu ym-p-settings-menu";
+      settingsWrap.append(settingsBtn, settingsMenu);
 
+      function makeSection(title) {
+        var sect = document.createElement("div");
+        sect.className = "ym-p-section";
+        var t = document.createElement("div");
+        t.className = "ym-p-section-title";
+        t.textContent = title;
+        var list = document.createElement("div");
+        sect.append(t, list);
+        return { sect: sect, list: list };
+      }
+
+      var qSect = makeSection("Качество");
+      var spdSect = makeSection("Скорость");
+      var asSect = makeSection("Автопропуск");
+
+      // пока качество не собрали — скрываем секцию
+      qSect.sect.style.display = "none";
+
+      // --- заполняем Скорость ---
+      SPEEDS.forEach(function (sp) {
+        var it = document.createElement("button");
+        it.className = "ym-p-popup-item";
+        if (sp === savedSpd) it.classList.add("active");
+        it.textContent = sp + "x";
+        it.addEventListener("click", function (e) {
+          e.stopPropagation();
+          targetSpeed = sp;
+          video.playbackRate = sp;
+          saveSpeed(sp);
+          spdSect.list
+            .querySelectorAll(".ym-p-popup-item")
+            .forEach(function (x) {
+              x.classList.toggle("active", x === it);
+            });
+        });
+        spdSect.list.appendChild(it);
+      });
+
+      // --- Автопропуск (toggle) ---
+      var asItem = document.createElement("button");
+      asItem.className = "ym-p-popup-item" + (autoSkipOn ? " active" : "");
+      asItem.textContent = autoSkipOn ? "✓ Включён" : "Выключен";
+      asItem.title = "Автопропуск интро/эндинг + след. серия (A)";
+      asItem.addEventListener("click", function (e) {
+        e.stopPropagation();
+        toggleAutoSkip();
+      });
+      asSect.list.appendChild(asItem);
+      _asItemRef = asItem;
+
+      settingsMenu.append(qSect.sect, spdSect.sect, asSect.sect);
+
+      settingsBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        settingsMenu.classList.toggle("open");
+      });
+
+      // --- Качество ---
       var savedQ = getSavedQuality();
       function fillQualityMenu(items) {
         if (!items.length) return;
-        qMenu.innerHTML = "";
+        qSect.list.innerHTML = "";
         var autoClicked = false;
         items.forEach(function (qObj) {
           var it = document.createElement("button");
@@ -628,16 +656,15 @@
           it.addEventListener("click", function (e) {
             e.stopPropagation();
             if (qObj.el) qObj.el.click();
-            qBtn.textContent = qObj.label;
             saveQuality(qObj.label);
-            qMenu.querySelectorAll(".ym-p-popup-item").forEach(function (x) {
-              x.classList.toggle("active", x === it);
-            });
-            qMenu.classList.remove("open");
+            qSect.list
+              .querySelectorAll(".ym-p-popup-item")
+              .forEach(function (x) {
+                x.classList.toggle("active", x === it);
+              });
           });
           if (savedQ && qObj.label === savedQ) {
             it.classList.add("active");
-            qBtn.textContent = qObj.label;
             if (!autoClicked && qObj.el) {
               autoClicked = true;
               setTimeout(function () {
@@ -645,16 +672,10 @@
               }, 300);
             }
           }
-          qMenu.appendChild(it);
+          qSect.list.appendChild(it);
         });
-        qWrap.style.display = "";
+        qSect.sect.style.display = "";
       }
-
-      qBtn.addEventListener("click", function (e) {
-        e.stopPropagation();
-        spdMenu.classList.remove("open"); // закрыть speed если открыт
-        qMenu.classList.toggle("open");
-      });
 
       // пробуем собрать quality
       var qIntervals = []; // для очистки при closeP
@@ -720,42 +741,9 @@
         qIntervals.push(qIv2);
       }
 
-      // --- speed popup ---
-      var spdWrap = document.createElement("div");
-      spdWrap.className = "ym-p-popup";
-      var spdMenu = document.createElement("div");
-      spdMenu.className = "ym-p-popup-menu";
-      spdWrap.append(spd, spdMenu);
-
-      SPEEDS.forEach(function (sp) {
-        var it = document.createElement("button");
-        it.className = "ym-p-popup-item";
-        if (sp === savedSpd) it.classList.add("active");
-        it.textContent = sp + "x";
-        it.addEventListener("click", function (e) {
-          e.stopPropagation();
-          targetSpeed = sp;
-          video.playbackRate = sp;
-          spd.textContent = sp + "x";
-          saveSpeed(sp);
-          spdMenu.querySelectorAll(".ym-p-popup-item").forEach(function (x) {
-            x.classList.toggle("active", x === it);
-          });
-          spdMenu.classList.remove("open");
-        });
-        spdMenu.appendChild(it);
-      });
-
-      spd.addEventListener("click", function (e) {
-        e.stopPropagation();
-        qMenu.classList.remove("open"); // закрыть quality если открыт
-        spdMenu.classList.toggle("open");
-      });
-
       // закрытие popup по клику вне
       function onDocClickPopup() {
-        qMenu.classList.remove("open");
-        spdMenu.classList.remove("open");
+        settingsMenu.classList.remove("open");
       }
       document.addEventListener("click", onDocClickPopup);
 
@@ -766,9 +754,7 @@
         prog,
         time,
         vw,
-        autoSkipWrap,
-        qWrap,
-        spdWrap,
+        settingsWrap,
         bPip,
         bFs,
       );
@@ -920,7 +906,13 @@
           video.addEventListener("loadedmetadata", onFirstUpdate);
         }
       }
-      video.play();
+      // play() может быть заблокирован autoplay policy если user activation
+      // истёк (например, после авто-открытия overlay). Глушим unhandled rejection —
+      // видео просто останется на паузе, пользователь тыкнет play сам.
+      try {
+        var pP = video.play();
+        if (pP && typeof pP.catch === "function") pP.catch(function () {});
+      } catch (ex) {}
 
       // блокируем события от плеера-хоста
       ov.addEventListener("mousedown", function (e) {
@@ -1303,7 +1295,7 @@
             bNext.click();
             break;
           case "a":
-            autoSkipWrap.click();
+            toggleAutoSkip();
             break;
           case "Escape":
             closeP();
@@ -1368,16 +1360,47 @@
         // не висим вечно — 60с и хватит
         setTimeout(function () { obs.disconnect(); }, 60000);
       } else {
-        // обычная страница — FAB-кнопка
-        var fab = document.createElement("div");
-        fab.id = "ym-p-fab";
-        fab.innerHTML = PICO.play + "<span>128 Player</span>";
-        fab.style.display = "flex";
-        fab.addEventListener("click", function () {
-          fab.style.display = "none";
-          activatePlayer();
-        });
-        document.body.appendChild(fab);
+        // обычная страница — FAB-кнопка, но только если есть iframe с известным плеером
+        var playerPatterns = [
+          'kodik', 'aniqit', 'anivod',
+          'alloha', 'allplay',
+          'videocdn', 'cdnmovies',
+          'hdvb',
+          'collaps', 'kollaps',
+          'ashdi',
+          'malt',
+          'sibnet',
+          'dzen', 'zen.yandex',
+          'rutube',
+          'vk.com/video',
+          'csst.online', 'sovetromantica',
+          'animejoy', 'animelib',
+          'kodikdb',
+          'cvh',
+        ];
+        var iframes = document.querySelectorAll("iframe[src]");
+        var hasPlayer = false;
+        for (var i = 0; i < iframes.length; i++) {
+          var src = (iframes[i].src || "").toLowerCase();
+          for (var j = 0; j < playerPatterns.length; j++) {
+            if (src.indexOf(playerPatterns[j]) !== -1) {
+              hasPlayer = true;
+              break;
+            }
+          }
+          if (hasPlayer) break;
+        }
+        if (hasPlayer) {
+          var fab = document.createElement("div");
+          fab.id = "ym-p-fab";
+          fab.innerHTML = PICO.play + "<span>128 Player</span>";
+          fab.style.display = "flex";
+          fab.addEventListener("click", function () {
+            fab.style.display = "none";
+            activatePlayer();
+          });
+          document.body.appendChild(fab);
+        }
       }
     }, 2500);
 })();
