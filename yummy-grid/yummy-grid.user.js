@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YummyAnime - Grid View
 // @namespace    https://github.com/128team/tm_scripts
-// @version      1.7.0
+// @version      1.7.1
 // @description  Сетка постеров аниме на странице профиля
 // @author       d08
 // @supportURL   https://github.com/128team/tm_scripts/issues
@@ -127,6 +127,10 @@
 
   let isOn = false;
   let savedUl = null;
+  // все родительские <ul> с постерами — на пагинации сайт может рендерить
+  // новые элементы в отдельный контейнер; если спрятать только savedUl, вторая
+  // партия <li> останется видной под сеткой. Храним Set чтобы при turnOff всё вернуть.
+  let hiddenUls = new Set();
   let gridDiv = null;
   let listObserver = null;
   let rebuildTimeout = null;
@@ -145,8 +149,6 @@
   try {
     sidebarHidden = localStorage.getItem("ymg-sidebar") === "1";
   } catch (e) {}
-
-  let lastItemsKey = ""; // fingerprint для skip лишних rebuild
 
   const isMobile = window.matchMedia("(pointer:coarse)").matches;
 
@@ -330,6 +332,8 @@
   function makeCard(d) {
     const c = document.createElement("div");
     c.className = "ym-card";
+    // ключ для инкрементального diff в rebuildGrid — чтоб не пересоздавать уже отрисованное
+    c.setAttribute("data-href", d.href);
     if (d.isOngoing) {
       c.setAttribute("data-slug", d.slug);
       c.setAttribute("data-ongoing", "1");
@@ -515,21 +519,14 @@
     badge.classList.add("loaded");
   }
 
-  //  пересборка грида - innerHTML = '' и погнали заново.
-  //  Virtual DOM? не, не слышали. работает - не трогай
+  //  пересборка грида - инкрементальный diff по href.
+  //  раньше делали innerHTML='' + recreate всех карточек на каждое шевеление DOM —
+  //  при автоподгрузке «Ещё» это выдавало визуальный «сброс» уже отрисованных
+  //  карточек и сбивало пользователя. Теперь переиспользуем существующие DOM-ноды
 
-  function itemsFingerprint(items) {
-    // быстрый fingerprint: кол-во + href первого и последнего
-    if (!items.length) return "";
-    const fa = items[0].querySelector("a");
-    const la = items[items.length - 1].querySelector("a");
-    return (
-      items.length +
-      ":" +
-      (fa ? fa.getAttribute("href") : "") +
-      ":" +
-      (la ? la.getAttribute("href") : "")
-    );
+  function hrefOf(li) {
+    const a = li.querySelector("a");
+    return a ? a.getAttribute("href") || "" : "";
   }
 
   function rebuildGrid() {
@@ -537,36 +534,73 @@
     const items = findItems();
     if (!items.length) return;
 
-    const newUl = items[0].parentElement;
-    if (newUl && newUl !== savedUl) {
-      if (savedUl) savedUl.classList.remove("ym-hide");
-      savedUl = newUl;
-      savedUl.classList.add("ym-hide");
-      if (gridDiv && gridDiv.parentNode) gridDiv.remove();
-      savedUl.parentNode.insertBefore(
-        gridDiv || createGridDiv(),
-        savedUl.nextSibling,
-      );
-    }
-
-    // skip если ничего не изменилось — главный буст на мобилке
-    const key = itemsFingerprint(items);
-    if (key === lastItemsKey && gridDiv && gridDiv.children.length) {
-      setupAutoLoad();
-      return;
-    }
-    lastItemsKey = key;
-
-    if (!gridDiv) return;
-    const frag = document.createDocumentFragment();
+    // собираем все уникальные родительские <ul> — сайт при пагинации
+    // может разложить новые <li> в отдельный контейнер
+    const parents = new Set();
     for (let i = 0; i < items.length; i++) {
-      frag.appendChild(makeCard(parse(items[i])));
+      const p = items[i].parentElement;
+      if (p) parents.add(p);
     }
-    gridDiv.innerHTML = "";
-    gridDiv.appendChild(frag); // один reflow вместо N
+    // unhide тех uls, которые ушли из списка (на случай навигации по SPA)
+    hiddenUls.forEach(function (ul) {
+      if (!parents.has(ul)) ul.classList.remove("ym-hide");
+    });
+    parents.forEach(function (ul) {
+      ul.classList.add("ym-hide");
+    });
+    hiddenUls = parents;
 
-    if (epLoadTimeout) clearTimeout(epLoadTimeout);
-    epLoadTimeout = setTimeout(loadEpisodes, 300);
+    // якорь — первый <ul> с постерами; туда пристыковываем грид
+    const anchorUl = items[0].parentElement;
+    if (!gridDiv) createGridDiv();
+    if (anchorUl && (savedUl !== anchorUl || !gridDiv.parentNode)) {
+      savedUl = anchorUl;
+      if (gridDiv.parentNode) gridDiv.remove();
+      savedUl.parentNode.insertBefore(gridDiv, savedUl.nextSibling);
+    }
+
+    // индекс уже отрисованных карточек по href — чтобы переиспользовать
+    const existing = new Map();
+    for (let i = 0; i < gridDiv.children.length; i++) {
+      const c = gridDiv.children[i];
+      existing.set(c.getAttribute("data-href"), c);
+    }
+
+    const wantHrefs = new Set();
+    const desired = [];
+    for (let i = 0; i < items.length; i++) {
+      const href = hrefOf(items[i]);
+      if (!href) continue;
+      wantHrefs.add(href);
+      desired.push({ href: href, li: items[i] });
+    }
+
+    // удаляем карточки, которых больше нет в списке (iterate задом наперёд)
+    for (let i = gridDiv.children.length - 1; i >= 0; i--) {
+      const c = gridDiv.children[i];
+      if (!wantHrefs.has(c.getAttribute("data-href"))) c.remove();
+    }
+
+    // раскладываем карточки в нужном порядке, создавая только недостающие
+    let anyAdded = false;
+    for (let i = 0; i < desired.length; i++) {
+      const { href, li } = desired[i];
+      let card = existing.get(href);
+      if (!card) {
+        card = makeCard(parse(li));
+        anyAdded = true;
+      }
+      if (gridDiv.children[i] !== card) {
+        gridDiv.insertBefore(card, gridDiv.children[i] || null);
+      }
+    }
+
+    // серии догружаем только если появились новые карточки —
+    // старые переиспользованы и их бейджи уже заполнены
+    if (anyAdded) {
+      if (epLoadTimeout) clearTimeout(epLoadTimeout);
+      epLoadTimeout = setTimeout(loadEpisodes, 300);
+    }
     setupAutoLoad();
   }
 
@@ -738,26 +772,19 @@
   //  как подмена ребёнка в роддоме, только с div-ами
 
   function turnOn() {
-    const items = findItems();
-    if (!items.length) return false;
-    savedUl = items[0].parentElement;
-    if (!savedUl) return false;
+    if (!findItems().length) return false;
     if (gridDiv) gridDiv.remove();
-    gridDiv = createGridDiv();
-    const frag = document.createDocumentFragment();
-    for (let i = 0; i < items.length; i++)
-      frag.appendChild(makeCard(parse(items[i])));
-    gridDiv.appendChild(frag);
-    savedUl.parentNode.insertBefore(gridDiv, savedUl.nextSibling);
-    lastItemsKey = itemsFingerprint(items);
-    savedUl.classList.add("ym-hide");
+    createGridDiv();
     isOn = true;
+    rebuildGrid();
+    if (!savedUl) {
+      isOn = false;
+      return false;
+    }
     startObserver();
     try {
       localStorage.setItem("ymg", "1");
     } catch (e) {}
-    setTimeout(loadEpisodes, 300);
-    setupAutoLoad();
     return true;
   }
 
@@ -768,7 +795,11 @@
       gridDiv.remove();
       gridDiv = null;
     }
-    if (savedUl) savedUl.classList.remove("ym-hide");
+    hiddenUls.forEach(function (ul) {
+      ul.classList.remove("ym-hide");
+    });
+    hiddenUls.clear();
+    savedUl = null;
     isOn = false;
     try {
       localStorage.setItem("ymg", "0");
@@ -781,18 +812,16 @@
   //  и отдельное спасибо всем браузерам за то что touch events - это пиздец
 
   function createMenu() {
-    // кнопочка. если GitHub CDN сдохнет - будет квадратик. жизнь боль
     const menuBtn = document.createElement("div");
     menuBtn.id = "ym-menu-btn";
     menuBtn.title = "YummyAnime Grid";
+    // тянем через jsDelivr (зеркало GitHub) — raw.githubusercontent.com массово
+    // блочат в фильтр-листах типа "Anti-Malware List"/"OISD", из-за чего лого пропадает.
+    // jsDelivr в таких списках не фигурирует.
     const fabImg = document.createElement("img");
     fabImg.src =
-      "https://raw.githubusercontent.com/128team/assets/main/logo128b.jpeg";
-    fabImg.alt = "YMG";
-    fabImg.onerror = function () {
-      fabImg.style.display = "none";
-      menuBtn.textContent = "\u229e";
-    };
+      "https://cdn.jsdelivr.net/gh/128team/assets@main/logo128b.jpeg";
+    fabImg.alt = "128";
     menuBtn.appendChild(fabImg);
 
     // выпадашка
