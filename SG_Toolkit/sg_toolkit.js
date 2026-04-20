@@ -2,7 +2,7 @@
 // @name         SG Toolkit Pro
 // @name:ru      SG Toolkit Pro
 // @namespace    https://github.com/128team/tm_scripts
-// @version      3.2.2
+// @version      3.2.3
 // @description     Advanced giveaway toolkit for SteamGifts - filters, inline enter, ratings, sorting & more
 // @description:ru  Продвинутый тулкит для SteamGifts — фильтры, inline enter, рейтинги Steam и сортировка
 // @author       d08
@@ -1250,7 +1250,8 @@ html.sgfp-dark ::-webkit-scrollbar-thumb:hover { background: #3e4450; }
 
     function createPanelDOM() {
         const fab = mkEl('div', { id: 'sgfp-fab', title: T('fab_title') });
-        fab.innerHTML = `<img class="sgfp-fab-icon" src="https://raw.githubusercontent.com/128team/assets/main/logo128b.jpeg" style="width:${Math.round(C.ui_fabSize * 0.65)}px;height:${Math.round(C.ui_fabSize * 0.65)}px;border-radius:4px;pointer-events:none">`;
+        // jsDelivr вместо raw.githubusercontent.com — последний массово блочат в фильтр-листах адблокеров
+        fab.innerHTML = `<img class="sgfp-fab-icon" src="https://cdn.jsdelivr.net/gh/128team/assets@main/logo128b.jpeg" style="width:${Math.round(C.ui_fabSize * 0.65)}px;height:${Math.round(C.ui_fabSize * 0.65)}px;border-radius:4px;pointer-events:none">`;
         document.body.appendChild(fab);
         restoreFabPosition(fab);
         makeFabDraggable(fab);
