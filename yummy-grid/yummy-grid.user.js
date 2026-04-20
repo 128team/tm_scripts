@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YummyAnime - Grid View
 // @namespace    https://github.com/128team/tm_scripts
-// @version      1.7.1
+// @version      1.7.2
 // @description  Сетка постеров аниме на странице профиля
 // @author       d08
 // @supportURL   https://github.com/128team/tm_scripts/issues
@@ -11,7 +11,7 @@
 // @match        https://yummyani.me/*
 // @match        https://site.yummyani.me/*
 // @grant        none
-// @icon         https://raw.githubusercontent.com/128team/assets/main/logo128b.jpeg
+// @icon         https://cdn.jsdelivr.net/gh/128team/assets@main/logo128b.jpeg
 // @run-at       document-end
 // @license      MIT
 // ==/UserScript==
