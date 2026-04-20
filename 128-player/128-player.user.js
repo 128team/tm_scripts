@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         128 Player
 // @namespace    https://github.com/128team/tm_scripts
-// @version      0.2.1
+// @version      0.2.2
 // @description  Кастомный видеоплеер — замена стандартных плееров на аниме-сайтах
 // @author       d08
 // @supportURL   https://github.com/128team/tm_scripts/issues
@@ -9,7 +9,7 @@
 // @downloadURL  https://raw.githubusercontent.com/128team/tm_scripts/main/128-player/128-player.user.js
 // @match        *://*/*
 // @grant        none
-// @icon         https://raw.githubusercontent.com/128team/assets/main/logo128b.jpeg
+// @icon         https://cdn.jsdelivr.net/gh/128team/assets@main/logo128b.jpeg
 // @run-at       document-end
 // @license      MIT
 // ==/UserScript==
