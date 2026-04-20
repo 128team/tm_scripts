@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         128 Player
 // @namespace    https://github.com/128team/tm_scripts
-// @version      0.2.0
+// @version      0.2.1
 // @description  Кастомный видеоплеер — замена стандартных плееров на аниме-сайтах
 // @author       d08
 // @supportURL   https://github.com/128team/tm_scripts/issues
@@ -87,9 +87,18 @@
       ".ym-p-popup-item:hover{background:rgba(255,255,255,.08);color:#fff;}",
       ".ym-p-popup-item.active{color:#4a9eff;font-weight:700;}",
       // секции внутри объединённого settings dropdown (качество/скорость/авто)
-      ".ym-p-settings-menu{min-width:130px;padding:2px 0;}",
+      // right:0 — прижимаем меню к правому краю шестерёнки, иначе у правого края плеера оно вылезает за экран
+      ".ym-p-settings-menu{right:0;min-width:180px;padding:2px 0;}",
       ".ym-p-section+.ym-p-section{border-top:1px solid rgba(255,255,255,.08);margin-top:3px;padding-top:3px;}",
       ".ym-p-section-title{padding:5px 14px 3px;color:#666;font:700 10px/1 inherit;text-transform:uppercase;letter-spacing:.6px;}",
+      // сворачиваемый заголовок секции (Качество/Скорость): клик раскрывает список
+      ".ym-p-section-head{display:flex;align-items:center;justify-content:space-between;width:100%;padding:8px 14px;background:none;border:none;color:#ccc;font:600 12px/1 inherit;cursor:pointer!important;text-align:left;text-transform:none;letter-spacing:0;}",
+      ".ym-p-section-head:hover{background:rgba(255,255,255,.06);color:#fff;}",
+      ".ym-p-section-val{display:flex;align-items:center;gap:6px;color:#4a9eff;font:600 11px/1 inherit;}",
+      '.ym-p-section-val::after{content:"\u203A";color:#666;font-size:16px;font-weight:400;transition:transform .15s;display:inline-block;}',
+      ".ym-p-section.open .ym-p-section-val::after{transform:rotate(90deg);}",
+      ".ym-p-section-body{display:none;padding-bottom:4px;}",
+      ".ym-p-section.open .ym-p-section-body{display:block;}",
       ".ym-p-settings-btn svg{width:18px;height:18px;fill:currentColor;display:block;}",
       ".ym-p-settings-btn{display:flex;align-items:center;padding:4px 6px;}",
       // автопропуск toggle
@@ -586,35 +595,66 @@
       settingsMenu.className = "ym-p-popup-menu ym-p-settings-menu";
       settingsWrap.append(settingsBtn, settingsMenu);
 
-      function makeSection(title) {
+      // collapsible=true — заголовок кликабельный, список скрыт по умолчанию,
+      // справа показывается текущее значение (1080p, 1x и т. п.). Открытие
+      // одной секции закрывает остальные collapsible-секции (accordion).
+      function makeSection(title, collapsible) {
         var sect = document.createElement("div");
         sect.className = "ym-p-section";
-        var t = document.createElement("div");
-        t.className = "ym-p-section-title";
-        t.textContent = title;
+        var t, val = null;
+        if (collapsible) {
+          t = document.createElement("button");
+          t.className = "ym-p-section-head";
+          var lbl = document.createElement("span");
+          lbl.textContent = title;
+          val = document.createElement("span");
+          val.className = "ym-p-section-val";
+          t.append(lbl, val);
+          t.addEventListener("click", function (e) {
+            e.stopPropagation();
+            var wasOpen = sect.classList.contains("open");
+            settingsMenu
+              .querySelectorAll(".ym-p-section.open")
+              .forEach(function (s) {
+                s.classList.remove("open");
+              });
+            if (!wasOpen) sect.classList.add("open");
+          });
+        } else {
+          t = document.createElement("div");
+          t.className = "ym-p-section-title";
+          t.textContent = title;
+        }
         var list = document.createElement("div");
+        list.className = collapsible ? "ym-p-section-body" : "";
         sect.append(t, list);
-        return { sect: sect, list: list };
+        return { sect: sect, list: list, val: val };
       }
 
-      var qSect = makeSection("Качество");
-      var spdSect = makeSection("Скорость");
-      var asSect = makeSection("Автопропуск");
+      var qSect = makeSection("Качество", true);
+      var spdSect = makeSection("Скорость", true);
+      var asSect = makeSection("Автопропуск", false);
 
       // пока качество не собрали — скрываем секцию
       qSect.sect.style.display = "none";
 
+      function fmtSpeed(sp) {
+        return sp + "x";
+      }
+
       // --- заполняем Скорость ---
+      spdSect.val.textContent = fmtSpeed(savedSpd);
       SPEEDS.forEach(function (sp) {
         var it = document.createElement("button");
         it.className = "ym-p-popup-item";
         if (sp === savedSpd) it.classList.add("active");
-        it.textContent = sp + "x";
+        it.textContent = fmtSpeed(sp);
         it.addEventListener("click", function (e) {
           e.stopPropagation();
           targetSpeed = sp;
           video.playbackRate = sp;
           saveSpeed(sp);
+          spdSect.val.textContent = fmtSpeed(sp);
           spdSect.list
             .querySelectorAll(".ym-p-popup-item")
             .forEach(function (x) {
@@ -649,6 +689,7 @@
         if (!items.length) return;
         qSect.list.innerHTML = "";
         var autoClicked = false;
+        var activeLabel = null;
         items.forEach(function (qObj) {
           var it = document.createElement("button");
           it.className = "ym-p-popup-item";
@@ -657,6 +698,7 @@
             e.stopPropagation();
             if (qObj.el) qObj.el.click();
             saveQuality(qObj.label);
+            qSect.val.textContent = qObj.label;
             qSect.list
               .querySelectorAll(".ym-p-popup-item")
               .forEach(function (x) {
@@ -665,6 +707,7 @@
           });
           if (savedQ && qObj.label === savedQ) {
             it.classList.add("active");
+            activeLabel = qObj.label;
             if (!autoClicked && qObj.el) {
               autoClicked = true;
               setTimeout(function () {
@@ -674,6 +717,8 @@
           }
           qSect.list.appendChild(it);
         });
+        // если сохранённого качества нет в списке — берём первое как fallback
+        qSect.val.textContent = activeLabel || (items[0] && items[0].label) || "";
         qSect.sect.style.display = "";
       }
 
