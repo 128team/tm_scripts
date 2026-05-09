@@ -1,7 +1,7 @@
   // ==UserScript==
   // @name         128 Player
   // @namespace    https://github.com/128team/tm_scripts
-  // @version      0.2.3
+  // @version      0.2.4
   // @description  Кастомный видеоплеер — замена стандартных плееров на аниме-сайтах
   // @author       d08
   // @supportURL   https://github.com/128team/tm_scripts/issues
@@ -81,7 +81,10 @@
         ".ym-p-skip.visible{display:block;}",
         // popup-меню (quality, speed)
         ".ym-p-popup{position:relative;z-index:11!important;}",
-        ".ym-p-popup-menu{display:none;position:absolute;bottom:100%;margin-bottom:8px;background:rgba(15,15,25,.96);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:4px 0;min-width:80px;z-index:200!important;box-shadow:0 8px 32px rgba(0,0,0,.5);}",
+        // max-height + overflow: на мобильной вертикальной ориентации плеер
+        // короткий, popup со скоростями (7 пунктов) вылезает за верх экрана —
+        // ограничиваем по viewport, лишнее скроллится внутри popup'а
+        ".ym-p-popup-menu{display:none;position:absolute;bottom:100%;margin-bottom:8px;background:rgba(15,15,25,.96);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:4px 0;min-width:80px;max-height:60vh;overflow-y:auto;overscroll-behavior:contain;z-index:200!important;box-shadow:0 8px 32px rgba(0,0,0,.5);}",
         ".ym-p-popup-menu.open{display:block;}",
         ".ym-p-popup-item{display:block;width:100%;padding:6px 14px;background:none;border:none;color:#aaa;font:12px/1 inherit;cursor:pointer!important;text-align:left;white-space:nowrap;}",
         ".ym-p-popup-item:hover{background:rgba(255,255,255,.08);color:#fff;}",
@@ -682,7 +685,18 @@
 
         settingsBtn.addEventListener("click", function (e) {
           e.stopPropagation();
+          var willOpen = !settingsMenu.classList.contains("open");
           settingsMenu.classList.toggle("open");
+          // на каждое открытие popup'а — все секции свёрнуты заново, чтобы
+          // юзер не видел "залипшую" Скорость/Качество с прошлого раза
+          if (willOpen) {
+            settingsMenu
+              .querySelectorAll(".ym-p-section.open")
+              .forEach(function (s) {
+                s.classList.remove("open");
+              });
+            settingsMenu.scrollTop = 0;
+          }
         });
 
         // --- Качество ---
