@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YummyAnime - Grid View
 // @namespace    https://github.com/128team/tm_scripts
-// @version      1.7.2
+// @version      1.7.3
 // @description  Сетка постеров аниме на странице профиля
 // @author       d08
 // @supportURL   https://github.com/128team/tm_scripts/issues
@@ -10,6 +10,7 @@
 // @match        https://ru.yummyani.me/*
 // @match        https://yummyani.me/*
 // @match        https://site.yummyani.me/*
+// @match        https://old.yummyani.me/*
 // @grant        none
 // @icon         https://cdn.jsdelivr.net/gh/128team/assets@main/logo128b.jpeg
 // @run-at       document-end
@@ -133,6 +134,7 @@
   let hiddenUls = new Set();
   let gridDiv = null;
   let listObserver = null;
+  let tabObserver = null; // old.yummyani.me: следит за toggle .active на .tab-content
   let rebuildTimeout = null;
   let epLoadTimeout = null;
   let scrollObserver = null;
@@ -202,7 +204,15 @@
     const imgs = document.querySelectorAll('li img[src*="posters"]');
     for (let i = 0; i < imgs.length; i++) {
       const li = imgs[i].closest("li");
-      if (li && result.indexOf(li) === -1) result.push(li);
+      if (!li || result.indexOf(li) !== -1) continue;
+      // old.yummyani.me: страница профиля — табы (Смотрю/В планах/Просмотрено/...).
+      // <li> всех списков лежат в DOM одновременно, активный определяется
+      // классом .active на родителе .tab-content. Чтобы не смешать всё в одну
+      // сетку — берём только <li> из активной вкладки. На сайтах без .tab-content
+      // (новая версия) closest вернёт null и фильтр пропустит элемент.
+      const tab = li.closest(".tab-content");
+      if (tab && !tab.classList.contains("active")) continue;
+      result.push(li);
     }
     return result;
   }
@@ -238,7 +248,9 @@
         d.posterFallback = "https:" + d.posterFallback;
     }
 
-    const statusEl = li.querySelector("span[data-status]");
+    // статус: новая версия — span[data-status], old — span.dote[title]
+    const statusEl =
+      li.querySelector("span[data-status]") || li.querySelector(".dote[title]");
     if (statusEl) {
       // сайт мигрировал с title=... на data-tooltip-content=... — читаем новое, старое оставляем fallback
       const tip =
@@ -246,12 +258,20 @@
         statusEl.getAttribute("title") ||
         "";
       d.status = parseStatus(tip);
-      d.isOngoing = statusEl.getAttribute("data-status") === "1";
+      if (statusEl.hasAttribute("data-status")) {
+        d.isOngoing = statusEl.getAttribute("data-status") === "1";
+      } else {
+        // на old. data-status нет — определяем по тексту title
+        const t = tip.toLowerCase();
+        d.isOngoing = t.indexOf("онгоинг") !== -1 || t.indexOf("выходит") !== -1;
+      }
     }
 
     // рейтинг аниме: data-balloon умер, теперь это data-tooltip-content="Рейтинг аниме"
+    // на old. остался data-balloon="Рейтинг аниме" — уточняем селектор, чтобы не подцепить "В любимых"
     const ratingEl =
       li.querySelector('span[data-tooltip-content="Рейтинг аниме"]') ||
+      li.querySelector('span[data-balloon="Рейтинг аниме"]') ||
       li.querySelector("span[data-balloon]");
     if (ratingEl) {
       const raw = ratingEl.textContent.replace(/[^\d.]/g, "");
@@ -264,6 +284,14 @@
       if (val > 0)
         d.score =
           scoreEl.textContent.replace(/[^\d]/g, "") || String(Math.round(val));
+    } else {
+      // old.: <span class="user-rating" data-id><i></i> 7</span>
+      // visibility:hidden = оценка не выставлена. Используем computed style.
+      const oldScoreEl = li.querySelector(".user-rating");
+      if (oldScoreEl && getComputedStyle(oldScoreEl).visibility !== "hidden") {
+        const raw = oldScoreEl.textContent.replace(/[^\d]/g, "");
+        if (raw && parseInt(raw, 10) > 0) d.score = raw;
+      }
     }
 
     const allSpans = li.querySelectorAll("a span");
@@ -309,19 +337,25 @@
 
     // «в любимых» — слот сердечка теперь есть ВСЕГДА (data-tooltip-content="Любимое"),
     // но у не-fav он скрыт через visibility:hidden. Используем getComputedStyle как источник правды.
-    const favSlot = li.querySelector('[data-tooltip-content="Любимое"]');
+    // на old. — span с data-balloon="В любимых", скрывается так же через visibility.
+    const favSlot =
+      li.querySelector('[data-tooltip-content="Любимое"]') ||
+      li.querySelector('[data-balloon="В любимых"]');
     if (favSlot && getComputedStyle(favSlot).visibility !== "hidden") {
       d.fav = true;
     }
 
     const btns = li.querySelectorAll("button[data-id]");
     for (let i = 0; i < btns.length; i++) {
-      // сохраняем SVG как DOM-ноду, не как строку — чтобы не вставлять сырой innerHTML
+      // сохраняем SVG как DOM-ноду, не как строку — чтобы не вставлять сырой innerHTML.
+      // на old. версии иконок-SVG нет, иконка рендерится Font Awesome через ::before
+      // на самой кнопке (классы `far fa-cloud list-button`) — переносим className.
       const svgEl = btns[i].querySelector("svg");
       d.buttons.push({
         title: btns[i].getAttribute("title") || "",
         color: btns[i].style.getPropertyValue("--color") || "",
         svgNode: svgEl ? svgEl.cloneNode(true) : null,
+        iconClass: !svgEl ? btns[i].className || "" : "",
         dataId: btns[i].getAttribute("data-id") || "",
       });
     }
@@ -397,6 +431,9 @@
         btnEl.setAttribute("data-id", b.dataId);
         if (b.color) btnEl.style.setProperty("--color", b.color);
         if (b.svgNode) btnEl.appendChild(b.svgNode.cloneNode(true));
+        // old.: SVG нет, иконка рисуется Font Awesome через ::before на самой
+        // кнопке. Переносим className, чтобы FA отрисовал иконку и в нашем меню
+        else if (b.iconClass) btnEl.className = b.iconClass;
         gearMenu.appendChild(btnEl);
       }
     }
@@ -677,9 +714,13 @@
 
   function startObserver() {
     if (listObserver) listObserver.disconnect();
-    const observeTarget = savedUl
-      ? savedUl.parentElement || document.body
-      : document.body;
+    // на old. при смене вкладки активный <ul> переезжает в другой <div class="tab-content">.
+    // Поднимаемся до .tabs-content (общего корня вкладок), чтобы видеть подгрузки в любой вкладке.
+    const tabsContainer = document.querySelector(".tabs-content");
+    const observeTarget =
+      tabsContainer ||
+      (savedUl ? savedUl.parentElement || document.body : document.body);
+    const onTabsContainer = !!tabsContainer;
     listObserver = new MutationObserver(function (mutations) {
       if (!isOn) return;
       let dominated = false;
@@ -691,8 +732,11 @@
         // игнорируем sentinel
         if (sentinel && (m.target === sentinel || sentinel.contains(m.target)))
           continue;
-        // реагируем только на изменения внутри или рядом с savedUl
+        // на новой версии — фильтруем по близости к savedUl, чтобы не реагировать
+        // на изменения комментариев/футера. На old. наблюдаем за .tabs-content
+        // целиком (вкладки, ленивые AJAX-подгрузки) — пропускаем этот фильтр.
         if (
+          !onTabsContainer &&
           savedUl &&
           m.target !== savedUl &&
           !savedUl.contains(m.target) &&
@@ -707,6 +751,25 @@
       if (dominated) scheduleRebuild();
     });
     listObserver.observe(observeTarget, { childList: true, subtree: true });
+
+    // old.: переключение вкладки = toggle .active на .tab-content без смены DOM-children.
+    // Слушаем изменение class на каждой вкладке отдельным observer'ом, чтоб не
+    // тащить subtree+attributes на огромное поддерево.
+    if (tabObserver) tabObserver.disconnect();
+    tabObserver = null;
+    const tabContents = document.querySelectorAll(".tab-content");
+    if (tabContents.length > 1) {
+      tabObserver = new MutationObserver(function () {
+        if (!isOn) return;
+        scheduleRebuild();
+      });
+      tabContents.forEach(function (tc) {
+        tabObserver.observe(tc, {
+          attributes: true,
+          attributeFilter: ["class"],
+        });
+      });
+    }
   }
 
   function stopObserver() {
@@ -714,11 +777,51 @@
       listObserver.disconnect();
       listObserver = null;
     }
+    if (tabObserver) {
+      tabObserver.disconnect();
+      tabObserver = null;
+    }
     if (rebuildTimeout) {
       clearTimeout(rebuildTimeout);
       rebuildTimeout = null;
     }
   }
+
+  //  scroll restore - возврат с карточки аниме обратно в список:
+  //  на full-reload браузер сам не угадывает позицию (особенно после нашего
+  //  rebuildGrid, который меняет высоту контейнера), на SPA-навигации pushState
+  //  тоже не сохраняет скролл. Сохраняем сами в sessionStorage под location.pathname
+
+  function saveScroll() {
+    if (!isOn) return;
+    try {
+      sessionStorage.setItem(
+        "ymg-scroll-" + location.pathname,
+        String(window.scrollY || window.pageYOffset || 0),
+      );
+    } catch (e) {}
+  }
+
+  function restoreScroll() {
+    try {
+      const key = "ymg-scroll-" + location.pathname;
+      const saved = sessionStorage.getItem(key);
+      if (saved === null) return;
+      sessionStorage.removeItem(key);
+      const y = parseInt(saved, 10);
+      if (isNaN(y) || y <= 0) return;
+      // двойной rAF: ждём layout после вставки грида и применения колонок —
+      // иначе scrollTo может промахнуться, если карточки ещё не получили высоту
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          window.scrollTo(0, y);
+        });
+      });
+    } catch (e) {}
+  }
+
+  window.addEventListener("beforeunload", saveScroll);
+  window.addEventListener("pagehide", saveScroll);
 
   //  SPA-перехват - monkey-patch history.pushState/replaceState.
   //  React думает что он тут главный? ха. мы патчим его роутер снизу
@@ -737,6 +840,9 @@
         urlChangeIv = null;
         rebuildGrid();
         startObserver();
+        // SPA-возврат с карточки аниме: после того как грид перестроился,
+        // возвращаем юзера на ту же позицию, с которой он уходил
+        restoreScroll();
       }
       if (attempts > 40) {
         clearInterval(urlChangeIv);
@@ -748,6 +854,9 @@
   const origPush = history.pushState;
   const origReplace = history.replaceState;
   history.pushState = function () {
+    // сохраняем скролл ДО смены URL — иначе сохраним под новым ключом
+    // и при возврате не найдём
+    saveScroll();
     origPush.apply(this, arguments);
     if (location.href !== lastUrl) {
       lastUrl = location.href;
@@ -785,6 +894,9 @@
     try {
       localStorage.setItem("ymg", "1");
     } catch (e) {}
+    // full-reload-возврат с карточки аниме (классическая навигация на old.):
+    // грид только что построен, теперь восстанавливаем сохранённый скролл
+    restoreScroll();
     return true;
   }
 
