@@ -1,7 +1,7 @@
   // ==UserScript==
   // @name         128 Player
   // @namespace    https://github.com/128team/tm_scripts
-  // @version      0.2.4
+  // @version      0.3.0
   // @description  Кастомный видеоплеер — замена стандартных плееров на аниме-сайтах
   // @author       d08
   // @supportURL   https://github.com/128team/tm_scripts/issues
@@ -197,6 +197,26 @@
           localStorage.setItem("ymp-autoskip", v ? "1" : "0");
         } catch (ex) {}
       }
+      // --- маркер авто-перехода на следующую серию ---
+      // ended + автопропуск → закрываем плеер → родитель кликает следующую
+      // серию → iframe пересоздаётся с новым документом. Origin у iframe тот же,
+      // так что флаг в localStorage доживает до нового документа и говорит ему:
+      // «это авто-переход, нажми play за юзера». Одноразовый, TTL 2 минуты.
+      function markAutoNext() {
+        try {
+          localStorage.setItem("ymp-autonext", String(Date.now()));
+        } catch (ex) {}
+      }
+      function consumeAutoNext() {
+        try {
+          var ts = parseFloat(localStorage.getItem("ymp-autonext")) || 0;
+          if (!ts) return false;
+          localStorage.removeItem("ymp-autonext");
+          return Date.now() - ts < 120000;
+        } catch (ex) {
+          return false;
+        }
+      }
 
       // таймкод: ключ = pathname из referrer или location
       function getTimeKey() {
@@ -353,6 +373,8 @@
         return items;
       }
 
+      var awaitingVideo = false;
+
       function activatePlayer() {
         if (
           document.getElementById("ym-player") ||
@@ -366,14 +388,20 @@
           openP(v);
           return;
         }
+        // ожидание уже запущено (повторный ym-open-player) — не дублируем слушатели
+        if (awaitingVideo) return;
+        awaitingVideo = true;
 
         // НЕ кликаем play в оригинальном плеере и НЕ показываем свой loading —
         // оба действия ломают VAST/HLS-цепочку allplay и выбивают видео в цикл
         // adtagstartloading. Вместо этого: пользователь сам тапает play на плеере
-        // сайта. Как только видео заиграет (readyState ≥ 2), наш pollTimer /
-        // MutationObserver подхватит его и поднимет overlay 128 Player поверх.
+        // сайта. Как только видео заиграет — canplay/playing поднимут overlay
+        // (media-события не всплывают, но capture-фаза на document их ловит).
+        // Слушатели живут БЕЗ дедлайна: раньше ждал только 15-секундный poll,
+        // и если после «следующей серии» юзер жал play позже — видео оставалось
+        // в оригинальном плеере.
 
-        // закрытие loading по Escape
+        // отмена ожидания по Escape
         function onEscLoading(ev) {
           if (ev.key === "Escape") {
             cleanup();
@@ -382,9 +410,15 @@
         document.addEventListener("keydown", onEscLoading);
 
         function cleanup() {
+          awaitingVideo = false;
           clearInterval(pollTimer);
-          if (obs) obs.disconnect();
+          if (obs) {
+            obs.disconnect();
+            obs = null;
+          }
           document.removeEventListener("keydown", onEscLoading);
+          document.removeEventListener("canplay", onMediaReady, true);
+          document.removeEventListener("playing", onMediaReady, true);
           var ld = document.getElementById("ym-p-loading");
           if (ld) ld.remove();
         }
@@ -399,18 +433,24 @@
           return false;
         }
 
+        function onMediaReady(e) {
+          if (e.target && e.target.tagName === "VIDEO") onVideoReady();
+        }
+        document.addEventListener("canplay", onMediaReady, true);
+        document.addEventListener("playing", onMediaReady, true);
+
         // просто ждём пока видео станет готовым. НЕ ретраим clickPlayOnce —
         // повторные клики во время загрузки HLS ломают SourceBuffer
         // (audio bufferAppendError → recoverMediaError → "по кадрово"-проигрывание).
+        // poll — страховка первых секунд (видео могло стать готовым до навески
+        // слушателей); по таймауту гаснет ТОЛЬКО poll, canplay/playing ждут дальше
         var attempts = 0;
         var pollTimer = setInterval(function () {
           attempts++;
-          if (onVideoReady() || attempts >= 50) {
+          if (onVideoReady()) return; // cleanup() уже вызван внутри
+          if (attempts >= 50) {
             clearInterval(pollTimer);
-            if (attempts >= 50) {
-              cleanup();
-              console.log("[128 Player] видео не загрузилось за 15с");
-            }
+            console.log("[128 Player] видео не запущено за 15с — ждём play юзера");
           }
         }, 300);
 
@@ -432,9 +472,78 @@
         }, 16000);
       }
 
-      // слушаем postMessage. кто пингует — тот и главный, мы подчиняемся
+      // --- автозапуск после авто-переключения серии ---
+      // «жмём play за юзера»: видео стартует, canplay ловят вечные слушатели
+      // (activatePlayer / standalone-ветка) и оверлей поднимается сам.
+      // У allplay DOM-клики ломают VAST-цепочку — там только video.play().
+      var AUTOPLAY_BTN_SELECTORS =
+        '.play_button, .vjs-big-play-button, [class*="play-button" i], ' +
+        '[class*="play_button" i], [class*="bigplay" i], button[aria-label*="play" i]';
+
+      function tryAutoplayNext() {
+        if (!isInIframe) return;
+        if (!getAutoSkip()) return;
+        if (!consumeAutoNext()) return;
+        var clicked = false;
+        var tries = 0;
+        var iv = setInterval(function () {
+          tries++;
+          if (document.getElementById("ym-player")) {
+            clearInterval(iv);
+            return;
+          }
+          var v = document.querySelector(
+            "video:not(.rmp-ad-vast-video-player)",
+          );
+          if (v && (v.currentSrc || v.src)) {
+            // видео уже есть — только play(), DOM-клики дальше не нужны
+            // (повторные клики во время загрузки HLS ломают SourceBuffer)
+            if (v.paused) {
+              try {
+                var p = v.play();
+                if (p && typeof p.catch === "function") p.catch(function () {});
+              } catch (ex) {}
+            }
+          } else if (
+            !clicked &&
+            tries >= 2 &&
+            !document.querySelector("[data-allplay]")
+          ) {
+            // видео ещё нет — один клик по кнопке плеера или по самому video.
+            // elementFromPoint по центру НЕ используем: там может быть кликандер
+            clicked = true;
+            var btn = document.querySelector(AUTOPLAY_BTN_SELECTORS);
+            if (btn) btn.click();
+            else if (v) v.click();
+          }
+          if (tries >= 15) clearInterval(iv);
+        }, 1000);
+      }
+      tryAutoplayNext();
+
+      // слушаем postMessage. кто пингует — тот и главный, мы подчиняемся.
+      // источники фильтруем: команды — только от родительской цепочки (грид
+      // сверху), pong/opened/closed — только от собственных child-iframe.
+      // postMessage умеет слать любой сайт — посторонние окна идут мимо
+      function isParentSource(src) {
+        return src === window.parent || src === window.top;
+      }
+      function isChildIframeSource(src) {
+        if (!src) return false;
+        var ifr = document.querySelectorAll("iframe");
+        for (var i = 0; i < ifr.length; i++) {
+          try {
+            if (ifr[i].contentWindow === src) return true;
+          } catch (ex) {}
+        }
+        return false;
+      }
+      // наш плеер открыт в child-iframe → свой FAB на странице не нужен
+      var iframePlayerOpen = false;
+
       window.addEventListener("message", function (e) {
         if (e.data === "ym-player-ping") {
+          if (!isParentSource(e.source)) return;
           managed = true;
           var fab = document.getElementById("ym-p-fab");
           if (fab) fab.style.display = "none";
@@ -444,17 +553,28 @@
         }
         // pong от iframe — значит грид обнаружил плеер, FAB не нужен
         if (e.data === "ym-player-pong") {
+          if (!isChildIframeSource(e.source)) return;
           managed = true;
           var fab = document.getElementById("ym-p-fab");
           if (fab) fab.style.display = "none";
           return;
         }
+        // плеер в iframe открылся/закрылся — прячем/возвращаем свой FAB
+        if (e.data === "ym-player-opened" || e.data === "ym-player-closed") {
+          if (!isChildIframeSource(e.source)) return;
+          iframePlayerOpen = e.data === "ym-player-opened";
+          var fab = document.getElementById("ym-p-fab");
+          if (fab) fab.style.display = iframePlayerOpen ? "none" : "flex";
+          return;
+        }
         if (e.data === "ym-close-player") {
+          if (!isParentSource(e.source)) return;
           var closeBtn = document.querySelector(".ym-p-close");
           if (closeBtn) closeBtn.click();
           return;
         }
         if (e.data !== "ym-open-player") return;
+        if (!isParentSource(e.source)) return;
         activatePlayer();
       });
 
@@ -581,6 +701,8 @@
         // авто-переключение на следующую серию по окончанию видео
         function onVideoEnded() {
           if (autoSkipOn) {
+            // новый документ iframe увидит маркер и сам нажмёт play
+            markAutoNext();
             bNext.click();
           }
         }
@@ -949,6 +1071,12 @@
 
         ov.append(cl, skipBtn, video, zones, centerIco, bufSpinner, ct);
         document.body.appendChild(ov);
+        // top-страница прячет свой FAB «128 Player», пока оверлей открыт в iframe
+        if (isInIframe) {
+          try {
+            window.top.postMessage("ym-player-opened", "*");
+          } catch (ex) {}
+        }
         // восстанавливаем сохранённый таймкод
         var savedTime = getSavedTime();
         if (savedTime > 0) {
@@ -1277,8 +1405,13 @@
           }
           video.removeAttribute("style");
           if (origStyle) video.setAttribute("style", origStyle);
-          if (origNext) origParent.insertBefore(video, origNext);
-          else origParent.appendChild(video);
+          // хост мог перерендерить DOM: если origNext уже не ребёнок origParent,
+          // insertBefore кинет NotFoundError и оборвёт closeP на середине
+          try {
+            if (origNext && origNext.parentNode === origParent)
+              origParent.insertBefore(video, origNext);
+            else origParent.appendChild(video);
+          } catch (ex) {}
           video.playbackRate = 1; // сбрасываем скорость при возврате
           if (wasPaused) video.pause();
           ov.remove();
@@ -1299,6 +1432,12 @@
             var fab = document.getElementById("ym-p-fab");
             if (fab) fab.style.display = "flex";
           }
+          // и возвращаем FAB top-странице, если оверлей жил в iframe
+          if (isInIframe) {
+            try {
+              window.top.postMessage("ym-player-closed", "*");
+            } catch (ex) {}
+          }
         }
         cl.addEventListener("click", closeP);
 
@@ -1314,9 +1453,11 @@
             }
           }
           var handled = true;
-          switch (e.key) {
-            case " ":
-            case "k":
+          // e.code вместо e.key: физическая клавиша не зависит от раскладки
+          // и CapsLock — на русской ("т" вместо "n") хоткеи раньше молчали
+          switch (e.code) {
+            case "Space":
+            case "KeyK":
               video.paused ? video.play() : video.pause();
               break;
             case "ArrowLeft":
@@ -1335,29 +1476,29 @@
               video.volume = Math.max(0, video.volume - 0.05);
               vol.value = video.volume;
               break;
-            case "f":
+            case "KeyF":
               toggleFs();
               break;
-            case "p":
+            case "KeyP":
               bPip.click();
               break;
-            case "m":
+            case "KeyM":
               video.muted = !video.muted;
               bVol.innerHTML = video.muted ? PICO.volM : PICO.vol;
               break;
-            case "s":
+            case "KeyS":
               if (skipBtn.classList.contains("visible")) skipBtn.click();
               break;
-            case "n":
-              video.currentTime = Math.min(
-                video.duration,
-                video.currentTime + 90,
-              );
+            case "KeyN":
+              // с шифтом — следующая серия, без — +90с
+              if (e.shiftKey) bNext.click();
+              else
+                video.currentTime = Math.min(
+                  video.duration,
+                  video.currentTime + 90,
+                );
               break;
-            case "N":
-              bNext.click();
-              break;
-            case "a":
+            case "KeyA":
               toggleAutoSkip();
               break;
             case "Escape":
@@ -1376,10 +1517,10 @@
         // блокируем keyup для тех же клавиш — оригинальный плеер может слушать keyup
         function onKeyUp(e) {
           if (!document.getElementById("ym-player")) return;
-          switch (e.key) {
-            case " ": case "k": case "ArrowLeft": case "ArrowRight":
-            case "ArrowUp": case "ArrowDown": case "f": case "p":
-            case "m": case "s": case "n": case "N": case "a": case "Escape":
+          switch (e.code) {
+            case "Space": case "KeyK": case "ArrowLeft": case "ArrowRight":
+            case "ArrowUp": case "ArrowDown": case "KeyF": case "KeyP":
+            case "KeyM": case "KeyS": case "KeyN": case "KeyA": case "Escape":
               e.preventDefault();
               e.stopPropagation();
               e.stopImmediatePropagation();
@@ -1457,9 +1598,16 @@
             var fab = document.createElement("div");
             fab.id = "ym-p-fab";
             fab.innerHTML = PICO.play + "<span>128 Player</span>";
-            fab.style.display = "flex";
+            // iframe мог открыть оверлей раньше, чем мы дошли до создания FAB
+            fab.style.display = iframePlayerOpen ? "none" : "flex";
             fab.addEventListener("click", function () {
               fab.style.display = "none";
+              // видео обычно живёт в iframe — шлём open и туда, не только себе
+              document.querySelectorAll("iframe").forEach(function (f) {
+                try {
+                  f.contentWindow.postMessage("ym-open-player", "*");
+                } catch (ex) {}
+              });
               activatePlayer();
             });
             document.body.appendChild(fab);
