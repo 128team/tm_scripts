@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YummyAnime - Grid View
 // @namespace    https://github.com/128team/tm_scripts
-// @version      1.7.3
+// @version      1.8.0
 // @description  Сетка постеров аниме на странице профиля
 // @author       d08
 // @supportURL   https://github.com/128team/tm_scripts/issues
@@ -9,7 +9,6 @@
 // @downloadURL  https://raw.githubusercontent.com/128team/tm_scripts/main/yummy-grid/yummy-grid.user.js
 // @match        https://ru.yummyani.me/*
 // @match        https://yummyani.me/*
-// @match        https://site.yummyani.me/*
 // @match        https://old.yummyani.me/*
 // @grant        none
 // @icon         https://cdn.jsdelivr.net/gh/128team/assets@main/logo128b.jpeg
@@ -91,10 +90,6 @@
     ".ym-gear-menu button:hover{background:rgba(255,255,255,.1);}",
     ".ym-gear-menu button svg{width:18px;height:18px;}",
     ".ym-hide{display:none!important;}",
-    // рейтинг-попап: React рендерит .jH внутри .dataRatingColored по своему hover,
-    // мы перехватываем видимость — скрыто всегда, показано только по нашему классу.
-    ".dataRatingColored > .jH{display:none!important;}",
-    ".dataRatingColored.ym-rate-open > .jH{display:flex!important;}",
     // убийца сайдбара. querySelector с wildcard - грязно, но работает
     '.ym-no-sidebar aside,.ym-no-sidebar div[class*="sidebar"],.ym-no-sidebar div[class*="Sidebar"]{display:none!important;}',
     // мобилка: пальцы - не курсор, увеличиваем всё, чтоб не промахнуться
@@ -363,11 +358,24 @@
     return d;
   }
 
+  // сигнатура изменяемых полей: юзер поставил оценку / сменился статус или
+  // сердечко — по ней rebuildGrid понимает, что карточку надо пересоздать,
+  // иначе переиспользованная по href карточка вечно показывает старые данные
+  function cardSig(d) {
+    return [
+      d.score,
+      d.fav ? 1 : 0,
+      d.status ? d.status.label : "",
+      d.rating,
+    ].join("|");
+  }
+
   function makeCard(d) {
     const c = document.createElement("div");
     c.className = "ym-card";
     // ключ для инкрементального diff в rebuildGrid — чтоб не пересоздавать уже отрисованное
     c.setAttribute("data-href", d.href);
+    c.setAttribute("data-sig", cardSig(d));
     if (d.isOngoing) {
       c.setAttribute("data-slug", d.slug);
       c.setAttribute("data-ongoing", "1");
@@ -626,6 +634,17 @@
       if (!card) {
         card = makeCard(parse(li));
         anyAdded = true;
+      } else {
+        // данные внутри li могли смениться (оценка/статус/сердечко) —
+        // сверяем сигнатуру и пересоздаём только изменившиеся карточки
+        const d = parse(li);
+        if (card.getAttribute("data-sig") !== cardSig(d)) {
+          const fresh = makeCard(d);
+          if (card.parentNode === gridDiv) gridDiv.replaceChild(fresh, card);
+          existing.set(href, fresh);
+          card = fresh;
+          anyAdded = true; // бейдж серий перезальётся из sessionStorage-кеша
+        }
       }
       if (gridDiv.children[i] !== card) {
         gridDiv.insertBefore(card, gridDiv.children[i] || null);
@@ -1055,6 +1074,40 @@
       "Боковая панель сайта",
     );
 
+    // --- переключение версии сайта: ru. <-> old. ---
+    // пути тайтлов/каталога на обеих версиях совпадают (/catalog/item/...),
+    // поэтому переносим текущий pathname+search как есть.
+    // localStorage у поддоменов раздельный — настройки грида не переезжают.
+    const isOldSite = location.hostname === "old.yummyani.me";
+    const siteTargetHost = isOldSite ? "ru.yummyani.me" : "old.yummyani.me";
+    const siteRow = document.createElement("div");
+    siteRow.className = "ym-menu-item";
+    const siteLbl = document.createElement("span");
+    siteLbl.className = "ym-menu-label";
+    const siteLink = document.createElement("a");
+    // SPA меняет URL после создания меню — href пересчитываем в момент клика
+    // (pointerdown срабатывает до навигации и до auxclick средней кнопкой)
+    function syncSiteLinkHref() {
+      siteLink.href =
+        "https://" + siteTargetHost + location.pathname + location.search;
+    }
+    syncSiteLinkHref();
+    siteLink.textContent = isOldSite
+      ? "⇄ На новую версию сайта"
+      : "⇄ На старую версию сайта";
+    siteLink.style.cssText = "color:#4a9eff;text-decoration:none;";
+    siteLink.addEventListener("pointerdown", syncSiteLinkHref);
+    siteLink.addEventListener("click", function (e) {
+      e.stopPropagation();
+      syncSiteLinkHref();
+    });
+    const siteDesc = document.createElement("span");
+    siteDesc.className = "ym-menu-desc";
+    siteDesc.textContent = siteTargetHost;
+    siteLbl.appendChild(siteLink);
+    siteLbl.appendChild(siteDesc);
+    siteRow.appendChild(siteLbl);
+
     // --- секция: 128 Player ---
     const playerSectionTitle = document.createElement("div");
     playerSectionTitle.className = "ym-section-title";
@@ -1126,9 +1179,23 @@
     installLbl.appendChild(installDesc);
     installRow.appendChild(installLbl);
 
+    // сообщения принимаем только от окон наших iframe —
+    // postMessage умеет слать любой сайт, посторонние окна идут мимо
+    function isChildIframeSource(src) {
+      if (!src) return false;
+      const ifr = document.querySelectorAll("iframe");
+      for (let i = 0; i < ifr.length; i++) {
+        try {
+          if (ifr[i].contentWindow === src) return true;
+        } catch (ex) {}
+      }
+      return false;
+    }
+
     // детект 128 Player через ping/pong
     window.addEventListener("message", function (e) {
       if (e.data === "ym-player-pong" && !playerDetected) {
+        if (!isChildIframeSource(e.source)) return;
         playerDetected = true;
         playerSw.row.style.display = "";
         installRow.style.display = "none";
@@ -1169,6 +1236,7 @@
     // слушаем команду "следующая серия" от iframe-плеера
     window.addEventListener("message", function (e) {
       if (e.data !== "ym-next-episode") return;
+      if (!isChildIframeSource(e.source)) return;
 
       // yummyani.me: активная серия — элемент с data-selected="1". Классы .zy/.zB
       // генерируемые, опираться на них нельзя. Важно: на странице есть ДРУГИЕ
@@ -1227,6 +1295,7 @@
     dropdown.appendChild(sizeRow);
     dropdown.appendChild(sidebarSectionTitle);
     dropdown.appendChild(sidebarSw.row);
+    dropdown.appendChild(siteRow);
     dropdown.appendChild(playerSectionTitle);
     dropdown.appendChild(playerSw.row);
     dropdown.appendChild(installRow);
@@ -1506,61 +1575,4 @@
     }
     if (t > 60) clearInterval(iv);
   }, 500);
-
-  // --- popup выставления оценки: toggle по клику (ПК + мобилка) ---
-  // раньше на ПК попап со звёздами 1–10 открывался по hover курсором — неудобно
-  // и не работает на touch. Подход: попап (.jH) React рендерит внутри
-  // .dataRatingColored при своём hover (reagentный, не через dispatchEvent),
-  // мы НЕ ПЫТАЕМСЯ этот рендер подавить — просто в CSS всегда скрываем .jH,
-  // а по клику добавляем класс .ym-rate-open, и CSS показывает попап.
-  // Когда юзер выбирает оценку (клик по .jL[data-rating]) или тыкает мимо —
-  // класс снимается с задержкой, чтобы клик по звёздочке успел обработаться.
-  (function initRatingToggle() {
-    var openEl = null;
-    var closeTimer = null;
-
-    function close() {
-      clearTimeout(closeTimer);
-      if (!openEl) return;
-      openEl.classList.remove("ym-rate-open");
-      openEl = null;
-    }
-
-    function open(el) {
-      close();
-      openEl = el;
-      el.classList.add("ym-rate-open");
-    }
-
-    document.addEventListener(
-      "click",
-      function (e) {
-        var rateStar = e.target.closest(".jL[data-rating]");
-        if (rateStar && openEl && openEl.contains(rateStar)) {
-          // клик по звезде 1–10 в открытом попапе — пусть сайт обработает,
-          // а мы просто закроем попап с небольшой задержкой
-          clearTimeout(closeTimer);
-          closeTimer = setTimeout(close, 200);
-          return;
-        }
-
-        var anchor = e.target.closest(".dataRatingColored");
-        if (anchor) {
-          // клик по самой плашке рейтинга — toggle
-          e.preventDefault();
-          e.stopPropagation();
-          if (openEl === anchor) close();
-          else open(anchor);
-          return;
-        }
-
-        // клик вне — закрываем
-        if (openEl) {
-          clearTimeout(closeTimer);
-          closeTimer = setTimeout(close, 150);
-        }
-      },
-      true,
-    );
-  })();
 })();
