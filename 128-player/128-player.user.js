@@ -1,7 +1,7 @@
   // ==UserScript==
   // @name         128 Player
   // @namespace    https://github.com/128team/tm_scripts
-  // @version      0.3.0
+  // @version      0.3.1
   // @description  Кастомный видеоплеер — замена стандартных плееров на аниме-сайтах
   // @author       d08
   // @supportURL   https://github.com/128team/tm_scripts/issues
@@ -11,7 +11,7 @@
   // @grant        none
   // @icon         https://cdn.jsdelivr.net/gh/128team/assets@main/logo128b.jpeg
   // @run-at       document-end
-  // @license      MIT
+  // @license      GPL-3.0-or-later
   // ==/UserScript==
 
   (function () {
@@ -485,6 +485,7 @@
         if (!getAutoSkip()) return;
         if (!consumeAutoNext()) return;
         var clicked = false;
+        var played = false;
         var tries = 0;
         var iv = setInterval(function () {
           tries++;
@@ -496,13 +497,37 @@
             "video:not(.rmp-ad-vast-video-player)",
           );
           if (v && (v.currentSrc || v.src)) {
-            // видео уже есть — только play(), DOM-клики дальше не нужны
-            // (повторные клики во время загрузки HLS ломают SourceBuffer)
-            if (v.paused) {
-              try {
-                var p = v.play();
-                if (p && typeof p.catch === "function") p.catch(function () {});
-              } catch (ex) {}
+            // видео уже поехало само — лезть не надо
+            if (!v.paused) {
+              clearInterval(iv);
+              return;
+            }
+            // Ждём, пока в буфере появятся данные. play() по ещё пустому video,
+            // пока балансер собирает HLS/MSE, вешает загрузку намертво — и
+            // раньше он летел КАЖДУЮ секунду, пока видео не готово, чем и
+            // добивал SourceBuffer. Теперь ровно один вызов, и только по делу.
+            // Но некоторые плееры с preload="none" не начнут грузить, пока их
+            // не попросишь, — таким через 4 секунды жмём play вслепую.
+            if (v.readyState < 2 && tries < 5) return;
+            if (played) return;
+            played = true;
+            try {
+              var p = v.play();
+              if (p && typeof p.then === "function") {
+                p.then(
+                  function () {
+                    clearInterval(iv);
+                  },
+                  function () {
+                    // автоплей запретили — пусть следующий тик попробует снова
+                    played = false;
+                  },
+                );
+              } else {
+                clearInterval(iv);
+              }
+            } catch (ex) {
+              played = false;
             }
           } else if (
             !clicked &&

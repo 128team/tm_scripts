@@ -38,4 +38,11 @@ Please open an [Issue](https://github.com/128team/tm_scripts/issues).
 
 ## License
 
-MIT
+[GPL-3.0-or-later](LICENSE). Fork it, change it, ship it — but a fork has to stay
+open under the same licence. No closed, rebadged paid clones.
+
+Earlier releases went out under MIT and stay MIT: a licence change only binds
+what comes after it.
+
+The names "128team", "128 Player", "YummyAnime Grid View" and the logo are not
+covered by the code licence. Call your fork something else.

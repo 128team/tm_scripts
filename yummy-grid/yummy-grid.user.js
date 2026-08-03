@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YummyAnime - Grid View
 // @namespace    https://github.com/128team/tm_scripts
-// @version      1.8.0
+// @version      1.8.1
 // @description  Сетка постеров аниме на странице профиля
 // @author       d08
 // @supportURL   https://github.com/128team/tm_scripts/issues
@@ -13,7 +13,7 @@
 // @grant        none
 // @icon         https://cdn.jsdelivr.net/gh/128team/assets@main/logo128b.jpeg
 // @run-at       document-end
-// @license      MIT
+// @license      GPL-3.0-or-later
 // ==/UserScript==
 
 (function () {
@@ -849,7 +849,6 @@
   let urlChangeIv = null; // один интервал на всех, чтоб быстрая навигация не плодила десятки
 
   function onUrlChange() {
-    if (!isOn) return;
     if (urlChangeIv) clearInterval(urlChangeIv);
     let attempts = 0;
     urlChangeIv = setInterval(function () {
@@ -857,11 +856,25 @@
       if (findItems().length > 0) {
         clearInterval(urlChangeIv);
         urlChangeIv = null;
-        rebuildGrid();
-        startObserver();
-        // SPA-возврат с карточки аниме: после того как грид перестроился,
-        // возвращаем юзера на ту же позицию, с которой он уходил
-        restoreScroll();
+        // список доехал - оживляем контролы. Раньше это умел только стартовый
+        // поллер, а он сдаётся через 30с: зашёл с главной, потыкал аниме,
+        // ушёл в профиль - и «Сетка» с размерами мертвы до F5
+        menu.unlock();
+        if (isOn) {
+          rebuildGrid();
+          startObserver();
+          // SPA-возврат с карточки аниме: после того как грид перестроился,
+          // возвращаем юзера на ту же позицию, с которой он уходил
+          restoreScroll();
+        } else {
+          // грид включён в настройках, но до этого момента включать было нечего.
+          // turnOn сам дёрнет restoreScroll
+          try {
+            if (localStorage.getItem("ymg") === "1" && turnOn()) {
+              menu.gridInp.checked = true;
+            }
+          } catch (e) {}
+        }
       }
       if (attempts > 40) {
         clearInterval(urlChangeIv);
@@ -1144,6 +1157,12 @@
           iframe.contentWindow.postMessage("ym-player-ping", "*");
         } catch (ex) {}
       });
+      // плеер сидит и в самой странице, а не только в iframe балансера.
+      // без этого на страницах без плеера (профиль, главная) пинговать было
+      // некого - и висела ссылка «Установить», хотя плеер давно стоит
+      try {
+        window.postMessage("ym-player-ping", "*");
+      } catch (ex) {}
     }
 
     const playerSw = makeSwitch(
@@ -1192,14 +1211,44 @@
       return false;
     }
 
+    // Сообщение пришло из нашей же вкладки: либо это мы сами, либо любой фрейм
+    // нашего дерева. Раньше проверяли только ПРЯМЫХ детей - и ломались на
+    // вложенных фреймах (kodik и компания любят iframe внутри iframe): плеер
+    // слал ym-player-closed, а мы его выбрасывали, и тумблер не гас.
+    // window.top у чужого окна читать можно и кросс-доменно, подделать - нет.
+    function isOwnTree(src) {
+      if (!src) return false;
+      if (src === window) return true;
+      try {
+        return src.top === window;
+      } catch (ex) {
+        return false;
+      }
+    }
+
     // детект 128 Player через ping/pong
     window.addEventListener("message", function (e) {
       if (e.data === "ym-player-pong" && !playerDetected) {
-        if (!isChildIframeSource(e.source)) return;
+        if (!isOwnTree(e.source)) return;
         playerDetected = true;
         playerSw.row.style.display = "";
         installRow.style.display = "none";
         if (playerEnabled) setTimeout(sendOpenPlayer, 500);
+        return;
+      }
+      // юзер закрыл плеер своей же кнопкой - гасим тумблер. Иначе он остаётся
+      // включённым, и на следующей серии плеер молча вылезет снова, хотя человек
+      // только что явно показал, что не хочет его сейчас
+      if (e.data === "ym-player-closed") {
+        if (!isOwnTree(e.source)) return;
+        if (!playerEnabled) return;
+        playerEnabled = false;
+        try {
+          localStorage.setItem("ymg-player", "0");
+        } catch (ex) {}
+        // присваивание checked не поднимает change - обработчик свитча
+        // не сработает и повторный sendClosePlayer не уйдёт
+        playerSw.inp.checked = false;
       }
     });
 
