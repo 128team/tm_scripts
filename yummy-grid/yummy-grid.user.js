@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YummyAnime - Grid View
 // @namespace    https://github.com/128team/tm_scripts
-// @version      1.8.2
+// @version      1.8.3
 // @description  Сетка постеров аниме на странице профиля
 // @author       d08
 // @supportURL   https://github.com/128team/tm_scripts/issues
@@ -959,12 +959,13 @@
     const menuBtn = document.createElement("div");
     menuBtn.id = "ym-menu-btn";
     menuBtn.title = "YummyAnime Grid";
-    // тянем через jsDelivr (зеркало GitHub) — raw.githubusercontent.com массово
-    // блочат в фильтр-листах типа "Anti-Malware List"/"OISD", из-за чего лого пропадает.
-    // jsDelivr в таких списках не фигурирует.
+    // Лого зашито прямо сюда. Раньше тянули с jsDelivr, потому что
+    // raw.githubusercontent.com массово блочат фильтр-листы вроде OISD и лого
+    // пропадало. Но и jsDelivr - внешний запрос: светит IP юзера чужому CDN и
+    // отваливается без сети. 116px хватает кнопке при 2x, а весит это 1 КБ.
     const fabImg = document.createElement("img");
     fabImg.src =
-      "https://cdn.jsdelivr.net/gh/128team/assets@main/logo128b.jpeg";
+      "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBAUEBAYFBQUGBgYHCQ4JCQgICRINDQoOFRIWFhUSFBQXGiEcFxgfGRQUHScdHyIjJSUlFhwpLCgkKyEkJST/2wBDAQYGBgkICREJCREkGBQYJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCT/wAARCAB0AHQDASIAAhEBAxEB/8QAHAABAAICAwEAAAAAAAAAAAAAAAEHBggCAwQF/8QANhAAAQMEAQMCBQEECwAAAAAAAQACAwQFBhEHEiExCEETIlFhcRQjMoGRFRYYM0JDUlVilNP/xAAVAQEBAAAAAAAAAAAAAAAAAAAAAf/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/ANcEREBERAREQEREBERAREQEREEFFJRAREQEREBERAREQEREBERAREQQUQoglERAREQEQuA8kD8lR1A9wRr8oJRR1t/1N/mgcD4IP4QSijraP8Q/mgc0+HA/xQSiIgIiIIKIUQSiIgljXSPaxjXOe4hrWtGy4nwAPcq9eNfTDcbvTtvueVDsfs7G/FNO5wZUSMHfbye0Lfz832HlV3xXyMeMsmZef6Et92aQGObUM/axDfd0Mnfod99HfhbI5LHjfqhxVkWOZZWW2vpB8R9smdpnV7fHh38w34e0kDfv4QVvR8g8WYdyLeaa2YpR3+x1MdFSUTmQRvjiezqbI4GUbd1F4+YfvdPv2WeZ/bONsV5osM2SW+y2y0Mss8zGOpg2CSp+M1rS5jG6cekv1sa7fYLWq+4jdsGzOOw3uGOKtp6iBzhHIHsc1zmlrmkeQR+D9QFe/qexG95vybjNmsFE+srJbbK7pBDWxtE3d73Hs1o2Nn7jyTpB1VvqD4pp66eng4uo6uOOV0cc8VHS9MwDtBzQW70exHv3X2OXMTxjIePsUvzcMZjlXW3ekgfTtgbTzshmkLXMf0AeQARvuNjwdrux7jDGfT/aosgvFtr8typwJp4qGjfM2J4HiMAEMA33kf3+gHhVDnuU8g8m5LbP600N3s1plr4aeCBlNLDDTF8gaHBzgOqTROnHv9AB2QXXyfmnG/EN4orBUca2+v8AiUbZ2SQUdPprepzA0l42T8nn7rjht3475rxvKKal4+orUKCmHU800LJCXteWljoxtpBZ5X2uTeUMh41utvsdowivymnFAx7q5xlkf1Bzm9LnNjdt2mgkk7+bwujGsxvXL+F5hbb1jVxw4RUYbHPE6SOSXqa8npL2N8dABA3sOI7bQVRxXxxx/wAucc0Vpbc4rZm9GJi98Y0+Vpe5zS9h0JWhpA23u3xsKtOQeLco40rv099oSKd7umCug2+nn/DvY/8AF2isx4T4FvGeQUuU1l0NiscTjJHVQSaqZCw6cYz/AJYBBHWfp2BVncseo3GbTZ5cUx6np8sm+F+nnqq/9tSdhrbif753bfbQ37+yDVJFye7qcXaa3ZJ00aA/A+i4oIKKSiAiIgL02641toroa+3Vc9HWQO6op4Hlj2H7ELzIg+5k2Z3jL8gjv95mjqLi1kLHSiMNEnwv3S4Dts6761/BZ3L6k8xly+nyp1HZP18FDJb2sEEnwzG+RrySOvfVto77/gqoRBeP9r7P/wDb8d/60v8A6LHc59RGY59aIbZcIbXSsgqoqyOWjieyRkkZ20gue4ee/j2VYIgu6H1d8gxQsY+ksErmtAMjqaQF5+p1IBs/YLy3n1W8gXm1VVu+FZqMVMbojPT07xIwEaJaXPIB1vvoqm0QZDNn2RzYfR4e24vgsdJ1kUsHyCYueXEyEd39z2B7D6e6x5EQEREAoiICIiAiIgIiICIiAiIgIiICIiCCiFEEopCFBCIiAiIgIiICIiAiIgIiIIKIUQSiIiCIiKIiICIiAiIgIiICFEQQUREH/9k=";
     fabImg.alt = "128";
     menuBtn.appendChild(fabImg);
 
