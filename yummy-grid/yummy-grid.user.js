@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YummyAnime - Grid View
 // @namespace    https://github.com/128team/tm_scripts
-// @version      1.8.1
+// @version      1.8.2
 // @description  Сетка постеров аниме на странице профиля
 // @author       d08
 // @supportURL   https://github.com/128team/tm_scripts/issues
@@ -1186,7 +1186,13 @@
     const installLbl = document.createElement("span");
     installLbl.className = "ym-menu-label";
     const installLink = document.createElement("a");
-    installLink.href = "https://github.com/128team/tm_scripts/raw/main/128-player/128-player.user.js";
+    // Скрипт и расширение - разные вещи, и каждый должен вести к своему. Ставить
+    // плеер обоими способами разом нельзя: два экземпляра подерутся за один
+    // <video>. Расширение метит документ из bridge.js, в Tampermonkey метки нет.
+    installLink.href =
+      document.documentElement.dataset.ymgExt === "1"
+        ? "https://chromewebstore.google.com/detail/eddkpbggfpfcdojidnhpijicnkhnflaf"
+        : "https://github.com/128team/tm_scripts/raw/main/128-player/128-player.user.js";
     installLink.target = "_blank";
     installLink.textContent = "\u2B07 Установить 128 Player";
     installLink.style.cssText = "color:#4a9eff;text-decoration:none;";
