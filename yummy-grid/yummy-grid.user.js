@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YummyAnime - Grid View
 // @namespace    https://github.com/128team/tm_scripts
-// @version      1.8.3
+// @version      1.9.3
 // @description  Сетка постеров аниме на странице профиля
 // @author       d08
 // @supportURL   https://github.com/128team/tm_scripts/issues
@@ -57,38 +57,54 @@
     ".ym-size-btn:hover{background:#1e2d3d;color:#b0bcc8;border-color:#4a8ab5;}",
     ".ym-size-btn.active{background:#1e3a5a;border-color:#4a8ab5;color:#7ab8e0;font-weight:700;}",
     ".ym-size-btn:disabled{opacity:.35;cursor:not-allowed;pointer-events:none;}",
+    // цвета грида берём из токенов темы сайта ([data-theme=dark|light]):
+    // --block-inner/--block для подложек, --main/--minor для текста,
+    // --color-* для акцентов. Так карточки едут за темой сами. Запасные
+    // значения в var() — для old.yummyani.me, где этих переменных нет.
     // грид - ради чего мы тут все собрались
     ".ym-grid{display:grid!important;gap:12px!important;padding:10px 8px!important;}",
-    ".ym-card{position:relative;border-radius:10px;overflow:hidden;background:#1e1e2e;}",
-    ".ym-card-poster{position:relative;width:100%;aspect-ratio:2/3;overflow:hidden;display:block;text-decoration:none;}",
+    // overflow:hidden у карточки срезал выпадающее меню шестерёнки, поэтому
+    // обрезку держит сам постер, а скругление низа даёт фон карточки —
+    // background и так обрезается по border-radius
+    ".ym-card{position:relative;border-radius:10px;background:var(--block-inner,#1e1e2e);}",
+    // карточка с открытым меню должна лежать выше соседей по сетке, иначе
+    // следующая карточка накроет выпавшую панель
+    ".ym-card:has(.ym-gear.open){z-index:10;}",
+    ".ym-card-poster{position:relative;width:100%;aspect-ratio:2/3;overflow:hidden;display:block;text-decoration:none;border-radius:10px 10px 0 0;}",
     ".ym-card-poster img{width:100%;height:100%;object-fit:cover;display:block;}",
-    ".ym-rating{position:absolute;top:6px;right:6px;background:rgba(0,0,0,.75);color:#ffc107;font-size:12px;font-weight:700;padding:3px 7px;border-radius:6px;z-index:3;display:flex;align-items:center;gap:3px;backdrop-filter:blur(4px);}",
-    ".ym-rating svg{width:11px;height:11px;fill:#ffc107;}",
-    ".ym-score{position:absolute;bottom:6px;left:6px;background:rgba(60,206,123,.9);color:#fff;font-size:11px;font-weight:700;padding:2px 7px;border-radius:5px;z-index:3;display:flex;align-items:center;gap:3px;}",
+    ".ym-rating{position:absolute;top:6px;right:6px;background:rgba(0,0,0,.75);color:var(--color-yellow,#ffc107);font-size:12px;font-weight:700;padding:3px 7px;border-radius:6px;z-index:3;display:flex;align-items:center;gap:3px;backdrop-filter:blur(4px);}",
+    ".ym-rating svg{width:11px;height:11px;fill:var(--color-yellow,#ffc107);}",
+    ".ym-score{position:absolute;bottom:6px;left:6px;background:var(--color-green,#3cce7b);color:#fff;font-size:11px;font-weight:700;padding:2px 7px;border-radius:5px;z-index:3;display:flex;align-items:center;gap:3px;}",
     ".ym-score svg{width:11px;height:11px;fill:#fff;}",
     ".ym-fav{position:absolute;bottom:6px;right:6px;z-index:3;}",
-    ".ym-fav svg{width:16px;height:16px;fill:#be46c6;}",
+    ".ym-fav svg{width:16px;height:16px;fill:var(--color-pink,#be46c6);}",
     // бейдж серий - «вышло 3 из 12, страдай»
-    ".ym-episodes{position:absolute;top:6px;left:6px;background:#a855f7;color:#fff;font-size:11px;font-weight:700;padding:2px 7px;border-radius:5px;z-index:3;display:none;}",
+    ".ym-episodes{position:absolute;top:6px;left:6px;background:var(--color-purple,#a855f7);color:#fff;font-size:11px;font-weight:700;padding:2px 7px;border-radius:5px;z-index:3;display:none;}",
     ".ym-episodes.loaded{display:block;}",
     // светофор статусов: зелёный - вышел, фиолетовый - онгоинг, красный - анонс (и боль)
     ".ym-status-bar{width:100%;padding:4px 0;text-align:center;font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:#fff;}",
-    ".ym-status-released{background:#3cce7b;}",
-    ".ym-status-ongoing{background:#a855f7;}",
-    ".ym-status-anons{background:#ef4444;}",
-    ".ym-status-unknown{background:#555;}",
+    ".ym-status-released{background:var(--color-green,#3cce7b);}",
+    ".ym-status-ongoing{background:var(--color-purple,#a855f7);}",
+    ".ym-status-anons{background:var(--color-red,#ef4444);}",
+    ".ym-status-unknown{background:var(--color-gray,#555);}",
     // инфо-блок с названием. -webkit-line-clamp потому что CSS так и не завезли нормальный ellipsis
     ".ym-info{padding:6px 7px 8px;display:flex;align-items:flex-start;gap:4px;}",
-    ".ym-title{font-weight:600;color:#e0e0e0;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;text-decoration:none;flex:1;}",
+    ".ym-title{font-weight:600;color:var(--main,#e0e0e0);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;text-decoration:none;flex:1;}",
     ".ym-title:hover{text-decoration:underline;}",
     ".ym-gear{flex-shrink:0;margin-top:1px;cursor:pointer;opacity:.45;transition:opacity .2s;display:flex;align-items:center;position:relative;}",
     ".ym-gear:hover{opacity:1;}",
-    ".ym-gear>svg{width:14px;height:14px;fill:#aaa;}",
-    ".ym-gear-menu{display:none;position:absolute;top:100%;right:0;background:#2a2a3e;border-radius:8px;padding:4px;z-index:100;box-shadow:0 4px 16px rgba(0,0,0,.5);min-width:36px;flex-direction:row;gap:2px;}",
+    ".ym-gear>svg{width:14px;height:14px;fill:var(--minor,#aaa);}",
+    ".ym-gear-menu{display:none;position:absolute;top:100%;right:0;background:var(--block,#2a2a3e);border-radius:8px;padding:4px;z-index:100;box-shadow:0 4px 16px rgba(0,0,0,.5);min-width:36px;flex-direction:row;gap:2px;}",
     ".ym-gear.open .ym-gear-menu{display:flex;}",
     ".ym-gear-menu button{background:none;border:none;cursor:pointer;padding:4px;border-radius:6px;display:flex;align-items:center;justify-content:center;transition:background .15s;}",
     ".ym-gear-menu button:hover{background:rgba(255,255,255,.1);}",
     ".ym-gear-menu button svg{width:18px;height:18px;}",
+    // заглушки на время переключения вкладки: карточки прошлого списка уже
+    // не про этот список, а новые ещё едут. Силуэт повторяет карточку, чтобы
+    // высота сетки не прыгала.
+    ".ym-skeleton{aspect-ratio:2/3;background:var(--block-inner,#1e1e2e);border-radius:10px;opacity:.5;animation:ym-pulse 1.2s ease-in-out infinite;}",
+    "@keyframes ym-pulse{0%,100%{opacity:.5;}50%{opacity:.25;}}",
+    "@media(prefers-reduced-motion:reduce){.ym-skeleton{animation:none;}}",
     ".ym-hide{display:none!important;}",
     // убийца сайдбара. querySelector с wildcard - грязно, но работает
     '.ym-no-sidebar aside,.ym-no-sidebar div[class*="sidebar"],.ym-no-sidebar div[class*="Sidebar"]{display:none!important;}',
@@ -135,6 +151,7 @@
   let scrollObserver = null;
   let sentinel = null;
   let autoLoadBusy = false;
+  let autoLoadChecked = false; // искали ли кнопку «Ещё» для текущего состояния
 
   let gridCols = "5";
   try {
@@ -191,6 +208,14 @@
   //  парсер DOM - reverse engineering вёрстки YummyAnime
   //  если они поменяют классы - всё сломается. но когда это нас останавливало?
 
+  //  Список под управлением react-virtuoso: он держит в DOM только окно
+  //  элементов и считает размеры контейнера. На old.yummyani.me такой разметки
+  //  нет, closest вернёт null, и поведение там прежнее.
+  function isVirtualized(el) {
+    if (!el || !el.closest) return false;
+    return !!el.closest("[data-virtuoso-scroller],[data-virtuoso-scroll-container]");
+  }
+
   function findItems() {
     // ищем img с постерами, а потом поднимаемся до <li>.
     // раньше выбирали ВСЕ <li> на странице (навигация, футер, комменты) и фильтровали —
@@ -212,6 +237,119 @@
     return result;
   }
 
+  //  ──────────────────────────────────────────────────── постеры
+  //
+  //  Сайт держит ровно пять размеров, и расширение файла жёстко связано с
+  //  размером: small/medium/big — .webp, huge/mega — .avif, full — .jpg.
+  //  Комбинации вроде huge.webp отдают 404, поэтому URL мы НИКОГДА не
+  //  собираем сами — только читаем те, что сайт уже положил в разметку.
+  //  Это ещё и вопрос форматов: набор в srcset сервер формирует под Accept
+  //  браузера, так что .avif там появляется только если браузер его понимает.
+  const POSTER_W = {
+    small: 33, medium: 184, big: 250, huge: 400, mega: 570, full: 1000,
+  };
+
+  function absUrl(u) {
+    u = (u || "").trim();
+    if (!u) return "";
+    return u.indexOf("//") === 0 ? "https:" + u : u;
+  }
+
+  function widthFromPath(u) {
+    const m = /\/posters\/([a-z]+)\//.exec(u || "");
+    return m && POSTER_W[m[1]] ? POSTER_W[m[1]] : 0;
+  }
+
+  //  Все варианты постера, которые сайт отдал этому браузеру: srcset + src.
+  //  Возвращаем по возрастанию ширины. У строки списка в src лежит 33px small
+  //  (компонент рендерится с width=33), поэтому одним src обходиться нельзя.
+  function posterCandidates(img) {
+    const out = [];
+    const seen = {};
+    function add(url, w) {
+      url = absUrl(url);
+      if (!url || seen[url]) return;
+      w = w || widthFromPath(url);
+      if (!w) return;
+      seen[url] = 1;
+      out.push({ url: url, w: w });
+    }
+    const raw = img.getAttribute("srcset") || "";
+    const parts = raw.split(",");
+    for (let i = 0; i < parts.length; i++) {
+      const bits = parts[i].trim().split(/\s+/);
+      if (bits[0]) add(bits[0], parseInt(bits[1], 10) || 0);
+    }
+    add(img.getAttribute("src") || "", 0);
+    out.sort(function (a, b) {
+      return a.w - b.w;
+    });
+    return out;
+  }
+
+  //  Наименьший кандидат, который не придётся растягивать.
+  function pickPoster(set, targetW) {
+    for (let i = 0; i < set.length; i++) {
+      if (set[i].w >= targetW) return set[i];
+    }
+    return set.length ? set[set.length - 1] : null;
+  }
+
+  //  Фактическая ширина колонки: повторяем расчёт auto-fill minmax(min,1fr),
+  //  чтобы отдать браузеру честный sizes — дальше он сам учтёт devicePixelRatio
+  //  и выберет кандидата. Читаем clientWidth один раз за перестройку, не на
+  //  каждую карточку: внутри цикла раскладки это был бы forced reflow.
+  let colWidthCache = 0;
+
+  function measureCol() {
+    const box = gridDiv && gridDiv.parentNode ? gridDiv : document.body;
+    const total = box.clientWidth || window.innerWidth || 1200;
+    const min = parseInt((COL_SIZES[gridCols] || COL_SIZES["5"]).min, 10);
+    const gap = 12; // .ym-grid{gap:12px}
+    const avail = Math.max(1, total - 16); // padding:10px 8px
+    const n = Math.max(1, Math.floor((avail + gap) / (min + gap)));
+    colWidthCache = Math.max(1, Math.ceil((avail - gap * (n - 1)) / n));
+    return colWidthCache;
+  }
+
+  //  «1д. 21ч.» — таймер до следующей серии. Сайт рендерит его span'ом с
+  //  классом-хешем (сейчас "Ad", раньше "nz"), который меняется от сборки к
+  //  сборке, поэтому опираемся на форму текста: только числа и короткие
+  //  единицы времени. Без этого таймер приклеивается к названию карточки.
+  function isTimeLabel(t) {
+    t = (t || "").trim();
+    if (!t || t.length > 24) return false;
+    return /^(\d+\s*[а-яёa-z]{1,3}\.?\s*)+$/i.test(t);
+  }
+
+  //  Кеш разбора строк. Список догружается порциями по 50, и каждая догрузка
+  //  вызывала перестройку, которая заново разбирала ВЕСЬ накопленный список:
+  //  на большом списке это тысячами лишних проходов. Пере-разбираем
+  //  только те <li>, внутри которых наблюдатель видел изменения; при догрузке
+  //  мутация приходит на контейнер, а не на строку, поэтому старые строки
+  //  берутся из кеша. WeakMap — чтобы удалённые строки уходили сами.
+  const parseCache = new WeakMap();
+  const dirtyItems = new Set();
+
+  function markDirty(node) {
+    const li = node && node.closest ? node.closest("li") : null;
+    if (li) dirtyItems.add(li);
+  }
+
+  function parseCached(li) {
+    if (!dirtyItems.has(li)) {
+      const hit = parseCache.get(li);
+      if (hit) return hit;
+    }
+    const d = parse(li);
+    parseCache.set(li, d);
+    // снимаем пометку только со строки, которую действительно разобрали:
+    // на old. строки неактивной вкладки в перестройку не попадают, и их
+    // пометка должна дожить до переключения вкладки
+    dirtyItems.delete(li);
+    return d;
+  }
+
   function parse(li) {
     const d = {
       href: "#",
@@ -230,17 +368,17 @@
     if (a) d.href = a.getAttribute("href") || "#";
     d.slug = d.href.replace("/catalog/item/", "");
 
-    // постер: на мобилке medium (легче), на десктопе big (чётче)
-    const img = li.querySelector('img[src*="posters"]');
+    // постер: data-big/data-medium сайт больше не отдаёт (ни новая версия, ни
+    // old.), а в src лежит 33-пиксельный small — строка списка рендерится
+    // компонентом с width=33. Настоящая лестница размеров живёт в srcset.
+    const img = li.querySelector('img[src*="posters"], img[srcset*="posters"]');
     if (img) {
-      const big = img.getAttribute("data-big") || "";
-      const med = img.getAttribute("data-medium") || "";
-      const src = img.getAttribute("src") || "";
-      d.poster = isMobile ? med || src || big : big || med || src;
-      d.posterFallback = isMobile ? src || med || big : med || src;
-      if (d.poster.indexOf("//") === 0) d.poster = "https:" + d.poster;
-      if (d.posterFallback && d.posterFallback.indexOf("//") === 0)
-        d.posterFallback = "https:" + d.posterFallback;
+      d.posterSet = posterCandidates(img);
+      const best = pickPoster(
+        d.posterSet,
+        (colWidthCache || measureCol()) * (window.devicePixelRatio || 1),
+      );
+      d.poster = best ? best.url : "";
     }
 
     // статус: новая версия — span[data-status], old — span.dote[title]
@@ -303,7 +441,8 @@
       const tip = sp.getAttribute("data-tooltip-content") || "";
       if (tip === "Рейтинг аниме" || tip === "Любимое" || tip.startsWith("Статус"))
         continue;
-      if (sp.classList.contains("nz")) continue; // "3д. 22ч." - это не название аниме, это твой дедлайн
+      if (sp.classList.contains("nz")) continue; // old.: "3д. 22ч." - это не название аниме, это твой дедлайн
+      if (isTimeLabel(sp.textContent)) continue; // он же на новой версии, где класс - хеш
       if (sp.querySelector("svg") && !sp.querySelector("span")) continue;
       // берём textContent, но вырезаем текст дочерних элементов которые мы бы пропустили
       // (таймер .nz, score [data-rating] и пр.), иначе "название3д. 22ч.0"
@@ -314,6 +453,13 @@
       for (let j = 0; j < junk.length; j++) {
         const junkTxt = junk[j].textContent;
         if (junkTxt) txt = txt.replace(junkTxt, "");
+      }
+      // таймер лежит вложенным span'ом без опознавательных атрибутов —
+      // ловим его по форме текста и вырезаем так же, как остальной мусор
+      const kids = sp.querySelectorAll("span");
+      for (let j = 0; j < kids.length; j++) {
+        const kidTxt = kids[j].textContent;
+        if (kidTxt && isTimeLabel(kidTxt)) txt = txt.replace(kidTxt, "");
       }
       txt = txt.trim();
       if (
@@ -383,7 +529,28 @@
 
     let h = "";
     h += '<a class="ym-card-poster" href="' + escAttr(d.href) + '">';
-    if (d.poster) h += '<img src="' + escAttr(d.poster) + '" loading="lazy">';
+    if (d.poster) {
+      // отдаём браузеру всю лестницу и реальную ширину колонки — дальше он сам
+      // учтёт devicePixelRatio и выберет кандидата. Без sizes srcset с
+      // w-дескрипторами трактуется как 100vw, и в сетку поедет самый крупный.
+      const set = d.posterSet || [];
+      let sset = "";
+      for (let i = 0; i < set.length; i++) {
+        sset += (i ? ", " : "") + set[i].url + " " + set[i].w + "w";
+      }
+      h +=
+        '<img src="' +
+        escAttr(d.poster) +
+        '"' +
+        (sset
+          ? ' srcset="' +
+            escAttr(sset) +
+            '" sizes="' +
+            (colWidthCache || measureCol()) +
+            'px"'
+          : "") +
+        ' loading="lazy" decoding="async">';
+    }
     // пустой бейдж - заполнится когда API соизволит ответить
     if (d.isOngoing) h += '<span class="ym-episodes"></span>';
     if (d.rating)
@@ -418,13 +585,32 @@
     h += "</div>";
     c.innerHTML = h;
 
-    // fallback постера: если основной URL не загрузился — пробуем запасной
-    if (d.posterFallback) {
+    // fallback постера: спускаемся по лестнице кандидатов вниз. srcset при этом
+    // снимаем — иначе браузер по тем же правилам снова выберет битый URL.
+    if (d.posterSet && d.posterSet.length > 1) {
       const posterImg = c.querySelector(".ym-card-poster img");
       if (posterImg) {
         posterImg.onerror = function () {
-          this.onerror = null;
-          this.src = d.posterFallback;
+          const set = d.posterSet;
+          this.removeAttribute("srcset");
+          this.removeAttribute("sizes");
+          let i = parseInt(this.getAttribute("data-fb"), 10);
+          if (isNaN(i)) {
+            i = set.length;
+            for (let k = 0; k < set.length; k++) {
+              if (set[k].url === d.poster) {
+                i = k;
+                break;
+              }
+            }
+          }
+          i -= 1;
+          if (i < 0) {
+            this.onerror = null; // лестница кончилась, дальше дёргать нечего
+            return;
+          }
+          this.setAttribute("data-fb", String(i));
+          this.src = set[i].url;
         };
       }
     }
@@ -591,6 +777,13 @@
       if (!parents.has(ul)) ul.classList.remove("ym-hide");
     });
     parents.forEach(function (ul) {
+      // display:none у виртуализированного списка убивает измерения: контейнер
+      // схлопывается в ноль, и библиотека перестаёт отдавать новые элементы —
+      // сетка осталась бы навсегда с одной первой порцией. Сейчас список
+      // профиля НЕ виртуализирован, но у соседних вкладок того же сайта
+      // virtuoso уже включён, так что список отделён от него одним пропом.
+      // Если это случится — лучше показать оба списка, чем сломать сайт.
+      if (isVirtualized(ul)) return;
       ul.classList.add("ym-hide");
     });
     hiddenUls = parents;
@@ -603,6 +796,10 @@
       if (gridDiv.parentNode) gridDiv.remove();
       savedUl.parentNode.insertBefore(gridDiv, savedUl.nextSibling);
     }
+
+    // ширину колонки меряем здесь: один раз за перестройку. Внутри цикла
+    // раскладки это был бы forced reflow на каждую карточку.
+    measureCol();
 
     // индекс уже отрисованных карточек по href — чтобы переиспользовать
     const existing = new Map();
@@ -626,18 +823,28 @@
       if (!wantHrefs.has(c.getAttribute("data-href"))) c.remove();
     }
 
+    // сначала читаем, потом пишем. parse() зовёт getComputedStyle (видимость
+    // сердечка), а это заставляет браузер синхронно пересчитать стили. Пока
+    // чтение чередовалось со вставками в сетку, пересчёт случался на КАЖДОЙ
+    // карточке — на списке в несколько сотен строк это ощутимо. Теперь парсим всё
+    // заранее, одним проходом по нетронутому DOM.
+    const parsed = [];
+    for (let i = 0; i < desired.length; i++) {
+      parsed.push(parseCached(desired[i].li));
+    }
+
     // раскладываем карточки в нужном порядке, создавая только недостающие
     let anyAdded = false;
     for (let i = 0; i < desired.length; i++) {
-      const { href, li } = desired[i];
+      const href = desired[i].href;
+      const d = parsed[i];
       let card = existing.get(href);
       if (!card) {
-        card = makeCard(parse(li));
+        card = makeCard(d);
         anyAdded = true;
       } else {
         // данные внутри li могли смениться (оценка/статус/сердечко) —
         // сверяем сигнатуру и пересоздаём только изменившиеся карточки
-        const d = parse(li);
         if (card.getAttribute("data-sig") !== cardSig(d)) {
           const fresh = makeCard(d);
           if (card.parentNode === gridDiv) gridDiv.replaceChild(fresh, card);
@@ -657,7 +864,13 @@
       if (epLoadTimeout) clearTimeout(epLoadTimeout);
       epLoadTimeout = setTimeout(loadEpisodes, 300);
     }
-    setupAutoLoad();
+    // Кнопку переискиваем, только когда список пополнился или мы ещё ни разу
+    // не смотрели для текущего состояния. Раньше это делала КАЖДАЯ перестройка,
+    // хотя на новой версии кнопки нет вовсе и результат не менялся.
+    if (anyAdded || !autoLoadChecked) {
+      autoLoadChecked = true;
+      setupAutoLoad();
+    }
   }
 
   function createGridDiv() {
@@ -669,6 +882,17 @@
 
   // автоподгрузка: ищем кнопку «Ещё» и кликаем её когда юзер доскроллил до конца грида
   function findMoreBtn() {
+    // На old. кнопка лежит по соседству со списком, поэтому сначала смотрим
+    // туда: на странице профиля новой версии кнопок под сотню (по несколько
+    // на каждую строку), и полный обход на каждой перестройке был заметен.
+    // Обход документа остаётся запасным путём — вёрстка old. не гарантирована.
+    const near = savedUl && savedUl.parentElement;
+    if (near) {
+      const local = near.querySelectorAll("button");
+      for (let i = 0; i < local.length; i++) {
+        if (local[i].textContent.trim() === "Ещё") return local[i];
+      }
+    }
     const buttons = document.querySelectorAll("button");
     for (let i = 0; i < buttons.length; i++) {
       if (buttons[i].textContent.trim() === "Ещё") return buttons[i];
@@ -764,7 +988,10 @@
           continue;
         if (m.addedNodes.length || m.removedNodes.length) {
           dominated = true;
-          break;
+          // раньше здесь стоял break: первой же мутации хватало, чтобы назначить
+          // перестройку. Теперь дочитываем список до конца — не ради самого
+          // факта перестройки, а чтобы знать, какие строки разбирать заново.
+          markDirty(m.target);
         }
       }
       if (dominated) scheduleRebuild();
@@ -850,6 +1077,20 @@
 
   function onUrlChange() {
     if (urlChangeIv) clearInterval(urlChangeIv);
+    // вкладку списка переключили — то, что в сетке, относится к прошлому
+    // списку. Показываем заглушки, пока сайт тянет новую порцию.
+    autoLoadChecked = false; // новая страница — кнопку ищем заново
+    const key = listKey();
+    const listChanged = key !== lastListKey;
+    lastListKey = key;
+    if (
+      listChanged &&
+      isOn &&
+      gridDiv &&
+      location.pathname.indexOf("/users/") !== -1
+    ) {
+      showSkeletons();
+    }
     let attempts = 0;
     urlChangeIv = setInterval(function () {
       attempts++;
@@ -879,8 +1120,43 @@
       if (attempts > 40) {
         clearInterval(urlChangeIv);
         urlChangeIv = null;
+        clearSkeletons(); // список не приехал — пустая сетка честнее пульсации
       }
     }, 250);
+  }
+
+  //  Заглушки живут только между сменой вкладки и приездом новых данных.
+  //  data-href у них нет, поэтому первый же rebuildGrid вынесет их сам —
+  //  как карточки, которых больше нет в списке.
+  //  Какой именно список сейчас открыт: профиль + вкладка (?subtab=N).
+  //  Возврат «назад» на ту же вкладку ключ не меняет — там карточки можно
+  //  переиспользовать, а не пересоздавать через заглушки.
+  function listKey() {
+    let tab = "";
+    try {
+      tab = new URLSearchParams(location.search).get("subtab") || "";
+    } catch (e) {}
+    return location.pathname + "|" + tab;
+  }
+
+  let lastListKey = listKey();
+
+  function showSkeletons() {
+    if (!gridDiv) return;
+    const prev = gridDiv.children.length;
+    gridDiv.textContent = "";
+    const n = Math.min(prev || 12, 18);
+    for (let i = 0; i < n; i++) {
+      const sk = document.createElement("div");
+      sk.className = "ym-skeleton";
+      gridDiv.appendChild(sk);
+    }
+  }
+
+  function clearSkeletons() {
+    if (!gridDiv) return;
+    const sk = gridDiv.querySelectorAll(".ym-skeleton");
+    for (let i = 0; i < sk.length; i++) sk[i].remove();
   }
 
   const origPush = history.pushState;
@@ -934,6 +1210,7 @@
 
   function turnOff() {
     teardownAutoLoad();
+    autoLoadChecked = false;
     stopObserver();
     if (gridDiv) {
       gridDiv.remove();
